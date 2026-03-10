@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Doc-Maker.site | Генератор Счетов и АВР онлайн</title>
-    <meta name="description" content="Сервис для создания Счетов и АВР по стандартам РК, РФ, РБ, КР. История документов и автозаполнение.">
+    <meta name="description" content="SEO-сервис для создания Счетов и АВР по стандартам СНГ. История документов и автозаполнение.">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,23 +26,23 @@
     <main class="container mx-auto p-4 flex-grow">
         <section id="auth-section" class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl mt-6 overflow-hidden grid grid-cols-1 md:grid-cols-2">
             <div class="p-8 bg-slate-50 border-r">
-                <h2 class="text-2xl font-bold mb-6 text-slate-800">Возможности SaaS</h2>
+                <h2 class="text-2xl font-bold mb-6 text-slate-800">Преимущества SEO-сервиса</h2>
                 <ul class="space-y-4 text-sm text-gray-600">
                     <li class="flex items-start gap-3">
                         <span class="text-blue-500 font-bold">●</span>
-                        <div><strong>ГОСТ стандарты:</strong> Счета и АВР адаптированы под законодательство 4-х стран.</div>
+                        <div><strong>ГОСТ стандарты:</strong> Счета и АВР адаптированы под законодательство 4-х стран (РК, РФ, РБ, КР).</div>
                     </li>
                     <li class="flex items-start gap-3">
                         <span class="text-blue-500 font-bold">●</span>
-                        <div><strong>Облачная история:</strong> Доступ к вашим документам с любого устройства 24/7.</div>
+                        <div><strong>SEO-оптимизация:</strong> Ваши документы всегда под рукой, структурированы и готовы к печати.</div>
                     </li>
                     <li class="flex items-start gap-3">
                         <span class="text-blue-500 font-bold">●</span>
-                        <div><strong>Умные реквизиты:</strong> Один раз введите свои данные, и они будут подставляться автоматически.</div>
+                        <div><strong>Умные реквизиты:</strong> Введите данные один раз, и система запомнит их для будущих документов.</div>
                     </li>
                     <li class="flex items-start gap-3">
                         <span class="text-blue-500 font-bold">●</span>
-                        <div><strong>Экспорт в PDF:</strong> Идеальное качество для отправки клиентам по email или в мессенджеры.</div>
+                        <div><strong>Профессиональный PDF:</strong> Идеальное отображение на любом устройстве при отправке клиенту.</div>
                     </li>
                 </ul>
             </div>
@@ -71,29 +71,31 @@
                 <div class="bg-white p-4 rounded-xl shadow border space-y-2">
                     <h3 class="font-bold text-gray-700 text-xs">Информация о документе</h3>
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" id="doc-number" placeholder="№ док-та" class="p-2 border rounded text-xs" oninput="updatePreview()">
+                        <input type="text" id="doc-number" placeholder="№" class="p-2 border rounded text-xs" oninput="updatePreview()">
                         <input type="date" id="doc-date" class="p-2 border rounded text-xs" oninput="updatePreview()">
                     </div>
                 </div>
 
                 <div class="bg-white p-4 rounded-xl shadow border space-y-2">
-                    <h3 class="font-bold text-gray-700 text-xs">Ваши реквизиты (Поставщик)</h3>
-                    <input type="text" id="p-name" placeholder="Название компании / ИП" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                    <h3 class="font-bold text-gray-700 text-xs">Ваши реквизиты</h3>
+                    <input type="text" id="p-name" placeholder="Название компании" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
                     <input type="text" id="p-tax" placeholder="БИН / ИНН" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
                     <input type="text" id="p-bank" placeholder="Банк и реквизиты" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                    <div id="staff-fields" class="space-y-2">
+                        </div>
                 </div>
 
                 <div id="dynamic-form" class="bg-white p-4 rounded-xl shadow border space-y-2"></div>
 
                 <div id="history-box" class="bg-white p-4 rounded-xl shadow border hidden">
-                    <h3 class="font-bold text-gray-700 text-xs mb-2">История</h3>
-                    <div id="history-list" class="space-y-1"></div>
+                    <h3 class="font-bold text-gray-700 text-xs mb-2">Последние документы</h3>
+                    <div id="history-list" class="space-y-1 text-[10px] text-gray-500 italic"></div>
                 </div>
             </div>
 
             <div class="lg:col-span-8 space-y-4">
                 <div class="no-print">
-                    <button onclick="downloadPDF()" class="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition">СКАЧАТЬ В PDF</button>
+                    <button onclick="downloadPDF()" class="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow-lg">СКАЧАТЬ В PDF</button>
                 </div>
                 <div id="doc-render-area" class="bg-white p-12 shadow-2xl min-h-[1000px] border border-gray-300 doc-paper overflow-x-auto"></div>
             </div>
