@@ -1,10 +1,10 @@
 let currentUser = null, selectedCountry = 'РК', docType = 'Счет', isGuest = false;
 
 const config = {
-    'РК': { tax: 'БИН/ИИН', bank: 'ИИК', cur: 'тенге', label: 'Казахстан' },
-    'РФ': { tax: 'ИНН/КПП', bank: 'Р/С', cur: 'руб.', label: 'Россия' },
-    'РБ': { tax: 'УНП', bank: 'IBAN', cur: 'бел. руб.', label: 'Беларусь' },
-    'КР': { tax: 'ИНН', bank: 'Р/С', cur: 'сом', label: 'Кыргызстан' }
+    'РК': { tax: 'БИН/ИИН', bank: 'ИИК', cur: 'тенге', flag: '🇰🇿' },
+    'РФ': { tax: 'ИНН/КПП', bank: 'Р/С', cur: 'руб.', flag: '🇷🇺' },
+    'РБ': { tax: 'УНП', bank: 'IBAN', cur: 'бел. руб.', flag: '🇧🇾' },
+    'КР': { tax: 'ИНН', bank: 'Р/С', cur: 'сом', flag: '🇰🇬' }
 };
 
 // --- AUTH ---
@@ -16,18 +16,17 @@ document.getElementById('logout-btn').onclick = () => location.reload();
 async function handleAuth(type) {
     const email = document.getElementById('email-input').value;
     const password = document.getElementById('password-input').value;
-    if(!email || password.length < 6) return alert("Email и пароль (мин. 6 знаков) обязательны");
+    if(!email || password.length < 6) return alert("Введите корректный email и пароль (мин. 6 символов)");
 
     const { data, error } = (type === 'login') 
         ? await db.auth.signInWithPassword({ email, password })
         : await db.auth.signUp({ email, password });
 
     if (error) alert(error.message);
-    else if (type === 'signup') alert("Регистрация успешна! Теперь войдите.");
+    else if (type === 'signup') alert("Регистрация успешна! Теперь вы можете войти.");
     else { currentUser = data.user; isGuest = false; startApp(); }
 }
 
-// --- APP CORE ---
 function startApp() {
     document.getElementById('auth-section').classList.add('hidden');
     document.getElementById('app-section').classList.remove('hidden');
@@ -35,9 +34,13 @@ function startApp() {
     
     if(!isGuest) { document.getElementById('history-box').classList.remove('hidden'); loadHistory(); }
     
+    // Загрузка сохраненных реквизитов поставщика
     document.getElementById('p-name').value = localStorage.getItem('p_name') || '';
     document.getElementById('p-tax').value = localStorage.getItem('p_tax') || '';
     document.getElementById('p-bank').value = localStorage.getItem('p_bank') || '';
+    
+    // Установка сегодняшней даты по умолчанию
+    document.getElementById('doc-date').valueAsDate = new Date();
 
     renderCountryBtns();
     renderForm();
@@ -46,7 +49,10 @@ function startApp() {
 
 function renderCountryBtns() {
     document.getElementById('country-btns').innerHTML = Object.keys(config).map(c => `
-        <button onclick="setCountry('${c}')" class="p-1 rounded border text-[10px] font-bold ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50'}">${c}</button>
+        <button onclick="setCountry('${c}')" class="p-2 rounded border flex flex-col items-center gap-1 transition ${selectedCountry === c ? 'bg-slate-800 text-white shadow-inner' : 'bg-gray-50 hover:bg-gray-200'}">
+            <span class="text-lg">${config[c].flag}</span>
+            <span class="text-[9px] font-bold">${c}</span>
+        </button>
     `).join('');
 }
 
@@ -54,8 +60,8 @@ window.setCountry = (c) => { selectedCountry = c; renderCountryBtns(); renderFor
 
 window.setDocType = (type) => {
     docType = type;
-    document.getElementById('btn-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs';
-    document.getElementById('btn-avr').className = type === 'АВР' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs';
+    document.getElementById('btn-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase transition' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase transition';
+    document.getElementById('btn-avr').className = type === 'АВР' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase transition' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase transition';
     updatePreview();
 };
 
@@ -63,118 +69,112 @@ function renderForm() {
     const f = config[selectedCountry];
     document.getElementById('dynamic-form').innerHTML = `
         <h3 class="font-bold text-gray-700 text-sm">Данные Клиента</h3>
-        <input type="text" id="c-name" placeholder="Наименование организации" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
-        <input type="text" id="c-tax" placeholder="${f.tax} клиента" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
-        <input type="number" id="val-amount" placeholder="Сумма" class="w-full p-2 border rounded text-xs font-bold" oninput="updatePreview()">
-        <textarea id="val-desc" rows="3" placeholder="Описание услуг" class="w-full p-2 border rounded text-xs" oninput="updatePreview()"></textarea>
+        <input type="text" id="c-name" placeholder="Название организации" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">
+        <input type="text" id="c-tax" placeholder="${f.tax} клиента" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">
+        <input type="number" id="val-amount" placeholder="Итоговая сумма" class="w-full p-2 border rounded text-xs font-bold outline-none" oninput="updatePreview()">
+        <textarea id="val-desc" rows="3" placeholder="За какие услуги/товары оплата?" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()"></textarea>
     `;
 }
 
-// --- PROFESSIONAL TEMPLATES ---
 function updatePreview() {
-    const pName = document.getElementById('p-name').value || 'ИП Иванов И.И.';
-    const pTax = document.getElementById('p-tax').value || '123456789012';
-    const pBank = document.getElementById('p-bank').value || 'АО "Банк", ИИК: KZ000...';
-    const cName = document.getElementById('c-name')?.value || 'ТОО "Заказчик"';
-    const cTax = document.getElementById('c-tax')?.value || '987654321098';
-    const amount = document.getElementById('val-amount')?.value || '0';
-    const desc = document.getElementById('val-desc')?.value || 'Информационные услуги';
+    const dNum = document.getElementById('doc-number').value || '___';
+    const dDateValue = document.getElementById('doc-date').value;
+    const dDate = dDateValue ? new Date(dDateValue).toLocaleDateString() : '___';
+    
+    const pn = document.getElementById('p-name').value || 'ИП / ТОО (Ваше название)';
+    const pt = document.getElementById('p-tax').value || 'БИН/ИНН';
+    const pb = document.getElementById('p-bank').value || 'Банк и номер счета';
+    const cn = document.getElementById('c-name')?.value || 'Название Клиента';
+    const ct = document.getElementById('c-tax')?.value || 'БИН/ИНН Клиента';
+    const am = document.getElementById('val-amount')?.value || '0';
+    const ds = document.getElementById('val-desc')?.value || 'Наименование выполненных работ или услуг';
     const f = config[selectedCountry];
 
-    localStorage.setItem('p_name', pName);
-    localStorage.setItem('p_tax', pTax);
-    localStorage.setItem('p_bank', pBank);
+    localStorage.setItem('p_name', pn);
+    localStorage.setItem('p_tax', pt);
+    localStorage.setItem('p_bank', pb);
 
-    let template = '';
-
+    let html = '';
     if (docType === 'Счет') {
-        template = `
+        html = `
             <div style="font-size: 11pt;">
-                <div style="border: 1px solid black; padding: 5px; margin-bottom: 20px; font-size: 10pt;">
-                    <strong>Банк Поставщика:</strong> ${pBank}
+                <div style="border: 1px solid black; padding: 10px; margin-bottom: 25px;">
+                    <strong>Банковские реквизиты поставщика:</strong><br>${pb}
                 </div>
-                <h2 style="text-align: center; font-weight: bold; border-bottom: 2px solid black; padding-bottom: 5px;">
-                    Счет на оплату №${Math.floor(Date.now()/100000)} от ${new Date().toLocaleDateString()}
+                <h2 style="text-align: center; font-weight: bold; font-size: 16pt; border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 20px;">
+                    Счет на оплату №${dNum} от ${dDate}
                 </h2>
-                <div style="margin: 20px 0;">
-                    <p><strong>Поставщик:</strong> ${pName}, ${f.tax}: ${pTax}</p>
-                    <p><strong>Покупатель:</strong> ${cName}, ${f.tax}: ${cTax}</p>
+                <div style="margin-bottom: 20px;">
+                    <p><strong>Поставщик:</strong> ${pn}, ${f.tax}: ${pt}</p>
+                    <p><strong>Покупатель:</strong> ${cn}, ${f.tax}: ${ct}</p>
                 </div>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
                     <thead>
-                        <tr style="background: #eee;">
-                            <th class="border-black">№</th><th class="border-black">Наименование товара/услуги</th><th class="border-black">Кол-во</th><th class="border-black">Сумма</th>
+                        <tr style="background: #f0f0f0;">
+                            <th class="border-black" style="width: 30px;">№</th>
+                            <th class="border-black">Наименование товара или услуги</th>
+                            <th class="border-black" style="width: 100px;">Сумма</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td class="border-black text-center">1</td><td class="border-black">${desc}</td><td class="border-black text-center">1</td><td class="border-black text-right">${amount}</td>
+                            <td class="border-black" style="text-align: center;">1</td>
+                            <td class="border-black" style="padding: 8px;">${ds}</td>
+                            <td class="border-black" style="text-align: right; padding: 8px;">${am}</td>
                         </tr>
                     </tbody>
                 </table>
-                <p style="text-align: right; font-weight: bold; margin-top: 10px;">ИТОГО К ОПЛАТЕ: ${amount} ${f.cur}</p>
-                <div style="margin-top: 50px; border-top: 1px solid #ccc; padding-top: 20px;">
-                    Руководитель: ________________ / ${pName} / <br><br> Бухгалтер: ________________
+                <p style="text-align: right; font-weight: bold; font-size: 12pt;">ИТОГО К ОПЛАТЕ: ${am} ${f.cur}</p>
+                <div style="margin-top: 60px; display: flex; justify-content: space-between;">
+                    <div>Руководитель: ________________ / ${pn}</div>
+                    <div>Бухгалтер: ________________</div>
                 </div>
             </div>
         `;
     } else {
-        template = `
+        html = `
             <div style="font-size: 11pt;">
-                <h2 style="text-align: center; font-weight: bold;">АКТ ВЫПОЛНЕННЫХ РАБОТ (ОКАЗАННЫХ УСЛУГ)</h2>
-                <p style="text-align: center;">от ${new Date().toLocaleDateString()}</p>
-                <div style="margin: 20px 0; border-top: 1px solid black; padding-top: 10px;">
-                    <p><strong>Исполнитель:</strong> ${pName}</p>
-                    <p><strong>Заказчик:</strong> ${cName}</p>
+                <h2 style="text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 5px;">АКТ ВЫПОЛНЕННЫХ РАБОТ (ОКАЗАННЫХ УСЛУГ)</h2>
+                <p style="text-align: center; margin-bottom: 25px;">№${dNum} от ${dDate}</p>
+                <div style="border-top: 1px solid black; padding-top: 10px; margin-bottom: 20px;">
+                    <p><strong>Исполнитель:</strong> ${pn}</p>
+                    <p><strong>Заказчик:</strong> ${cn}</p>
                 </div>
-                <p>Мы, нижеподписавшиеся, составили настоящий Акт о том, что Исполнителем были оказаны следующие услуги:</p>
-                <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-                    <tr style="background: #eee;">
-                        <th class="border-black">Наименование работ</th><th class="border-black">Сумма</th>
+                <p style="margin-bottom: 15px;">Настоящий Акт составлен о том, что Исполнитель оказал, а Заказчик принял следующие услуги:</p>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                    <tr style="background: #f0f0f0;">
+                        <th class="border-black">Описание работ</th><th class="border-black" style="width: 100px;">Сумма</th>
                     </tr>
                     <tr>
-                        <td class="border-black">${desc}</td><td class="border-black text-right">${amount}</td>
+                        <td class="border-black" style="padding: 10px;">${ds}</td><td class="border-black" style="text-align: right; padding: 10px;">${am}</td>
                     </tr>
                 </table>
-                <p>Вышеуказанные услуги выполнены полностью и в срок. Заказчик претензий по объему, качеству и срокам оказания услуг не имеет.</p>
-                <div style="margin-top: 40px; display: flex; justify-content: space-between;">
-                    <div style="width: 45%;"><strong>Исполнитель:</strong><br><br>________________ / ${pName}</div>
-                    <div style="width: 45%;"><strong>Заказчик:</strong><br><br>________________ / ${cName}</div>
+                <p style="font-style: italic; font-size: 10pt;">Вышеуказанные услуги выполнены полностью и в срок. Заказчик претензий по качеству и объему не имеет.</p>
+                <div style="margin-top: 60px; display: flex; justify-content: space-between;">
+                    <div style="width: 45%; border-top: 1px solid black; padding-top: 5px;"><strong>Исполнитель</strong></div>
+                    <div style="width: 45%; border-top: 1px solid black; padding-top: 5px;"><strong>Заказчик</strong></div>
                 </div>
             </div>
         `;
     }
-    document.getElementById('doc-render-area').innerHTML = template;
+    document.getElementById('doc-render-area').innerHTML = html;
 }
 
-// --- EXPORT ---
 async function downloadPDF() {
     if(!isGuest) await saveToDB();
     const element = document.getElementById('doc-render-area');
-    html2pdf().from(element).set({ margin: 10, filename: `${docType}.pdf`, html2canvas: { scale: 2 } }).save();
-}
-
-async function downloadXLSX() {
-    if(!isGuest) await saveToDB();
-    const data = [
-        ["ДОКУМЕНТ", docType], ["ДАТА", new Date().toLocaleDateString()],
-        ["ПОСТАВЩИК", document.getElementById('p-name').value],
-        ["КЛИЕНТ", document.getElementById('c-name').value],
-        ["УСЛУГА", document.getElementById('val-desc').value],
-        ["ИТОГО", document.getElementById('val-amount').value, config[selectedCountry].cur]
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Doc");
-    XLSX.writeFile(wb, `${docType}.xlsx`);
+    const opt = { margin: 10, filename: `${docType}_${document.getElementById('doc-number').value}.pdf`, html2canvas: { scale: 3 } };
+    html2pdf().from(element).set(opt).save();
 }
 
 async function saveToDB() {
     const payload = {
-        user_id: currentUser.id, country: selectedCountry,
+        user_id: currentUser.id,
+        country: selectedCountry,
         client_name: document.getElementById('c-name').value,
         amount: parseFloat(document.getElementById('val-amount').value) || 0,
-        document_type: docType, provider_name: document.getElementById('p-name').value
+        document_type: docType,
+        provider_name: document.getElementById('p-name').value
     };
     await db.from('invoices').insert([payload]);
     loadHistory();
@@ -183,10 +183,11 @@ async function saveToDB() {
 async function loadHistory() {
     const { data } = await db.from('invoices').select('*').order('created_at', { ascending: false }).limit(5);
     const cont = document.getElementById('history-list');
-    if (data && data.length > 0) {
+    if (data) {
         cont.innerHTML = data.map(i => `
-            <div class="text-[9px] p-1 border rounded bg-gray-50 mb-1">
-                ${i.document_type}: ${i.client_name} (${i.amount})
+            <div class="text-[10px] p-2 border rounded bg-gray-50 flex justify-between">
+                <span><b>${i.document_type}</b>: ${i.client_name}</span>
+                <span class="font-bold">${i.amount}</span>
             </div>
         `).join('');
     }
