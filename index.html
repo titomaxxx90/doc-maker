@@ -3,67 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doc-Maker | Создание счетов и АВР</title>
-    <meta name="description" content="SaaS сервис для генерации счетов на оплату и АВР. Поддержка стран: РК, РФ, РБ, КР.">
-    
+    <title>Doc-Maker.site | Счета и АВР</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        @media print { .no-print { display: none; } }
+        .ads-box { background: #f9f9f9; border: 1px dashed #ccc; text-align: center; color: #999; padding: 10px; }
+    </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
+<body class="bg-gray-100 min-h-screen flex flex-col font-sans">
 
-    <header class="bg-blue-600 text-white shadow-md">
-        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-bold tracking-wider">Doc-Maker.site</h1>
-            <div id="user-info" class="hidden flex items-center gap-4">
-                <span id="user-email" class="text-sm"></span>
-                <button id="logout-btn" class="bg-blue-800 hover:bg-blue-900 px-3 py-1 rounded text-sm transition">Выйти</button>
+    <div class="ads-box w-full no-print">Место для рекламы (Google/Yandex) - Top Banner</div>
+
+    <header class="bg-slate-800 text-white p-4 shadow-lg no-print">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-black tracking-tighter">DOC-MAKER<span class="text-blue-400">.SITE</span></h1>
+            <div id="user-info" class="hidden flex items-center gap-4 text-sm">
+                <span id="user-email" class="opacity-70"></span>
+                <button id="logout-btn" class="bg-red-500/20 hover:bg-red-500 px-3 py-1 rounded transition">Выйти</button>
             </div>
         </div>
     </header>
 
-    <main class="flex-grow container mx-auto px-4 py-8">
-        
-        <div id="auth-section" class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg mt-10">
-            <h2 class="text-2xl font-bold mb-6 text-center text-gray-700">Вход в систему</h2>
-            <input type="email" id="email-input" placeholder="Ваш Email" class="w-full mb-4 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="password" id="password-input" placeholder="Ваш Пароль" class="w-full mb-6 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <button id="login-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition mb-2">Войти</button>
-            <button id="register-btn" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded transition">Создать аккаунт</button>
-            <p id="auth-message" class="mt-4 text-center text-sm font-semibold hidden"></p>
+    <main class="flex-grow container mx-auto p-4 max-w-6xl">
+        <div id="auth-section" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl mt-10">
+            <h2 class="text-2xl font-bold mb-6 text-center">Вход в SaaS</h2>
+            <input type="email" id="email-input" placeholder="Email" class="w-full mb-3 p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="password" id="password-input" placeholder="Пароль" class="w-full mb-3 p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
+            <button id="login-btn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl mb-2 hover:bg-blue-700 transition">Войти</button>
+            <button id="register-btn" class="w-full text-gray-500 text-sm hover:underline">Нет аккаунта? Регистрация</button>
+            <p id="auth-message" class="mt-4 text-center text-xs hidden"></p>
         </div>
 
-        <div id="app-section" class="hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
-                <div id="form-container" class="bg-white p-6 rounded-xl shadow-lg">
-                    <h3 class="text-xl font-bold mb-4 border-b pb-2">Данные для документа</h3>
-                    <div id="dynamic-form-area"></div>
+        <div id="app-section" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 mt-4">
+            <div class="lg:col-span-4 space-y-4 no-print">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border">
+                    <h3 class="font-bold mb-3 text-gray-700">1. Тип документа и Страна</h3>
+                    <div class="flex gap-2 mb-4">
+                        <button onclick="setDocType('Счет')" id="btn-type-inv" class="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold">СЧЕТ</button>
+                        <button onclick="setDocType('АВР')" id="btn-type-avr" class="flex-1 py-2 rounded-lg bg-gray-100 text-gray-600 text-sm font-bold">АВР</button>
+                    </div>
+                    <div id="country-btns" class="grid grid-cols-4 gap-1"></div>
                 </div>
 
-                <div id="preview-container" class="bg-white p-6 rounded-xl shadow-lg flex flex-col">
-                    <h3 class="text-xl font-bold mb-4 border-b pb-2">Предпросмотр документа</h3>
-                    
-                    <div id="document-preview" class="flex-grow border-2 border-dashed border-gray-300 p-8 rounded bg-white overflow-auto text-sm text-black">
-                        </div>
-                    
-                    <div class="mt-6 flex flex-wrap gap-2">
-                        <button id="export-pdf-btn" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-2 rounded transition font-semibold shadow">Скачать PDF</button>
-                        <button id="export-excel-btn" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-2 rounded transition font-semibold shadow">Скачать Excel</button>
-                        <button id="save-db-btn" class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-2 rounded transition font-semibold shadow">В историю</button>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border">
+                    <h3 class="font-bold mb-3 text-gray-700">2. Поставщик (Вы)</h3>
+                    <input type="text" id="p-name" placeholder="Ваша компания / ИП" class="w-full p-2 mb-2 border rounded-lg text-sm" oninput="updatePreview()">
+                    <input type="text" id="p-tax" placeholder="Ваш ИНН/БИН" class="w-full p-2 border rounded-lg text-sm" oninput="updatePreview()">
+                </div>
+
+                <div id="dynamic-form" class="bg-white p-5 rounded-2xl shadow-sm border">
+                    <h3 class="font-bold mb-3 text-gray-700">3. Данные клиента</h3>
+                    </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border">
+                    <h3 class="font-bold mb-3 text-gray-700">4. История</h3>
+                    <div id="history-list" class="text-xs space-y-2 max-h-40 overflow-y-auto">
+                        Загрузка истории...
                     </div>
                 </div>
+            </div>
 
+            <div class="lg:col-span-8 flex flex-col">
+                <div class="bg-white p-2 rounded-t-2xl border-x border-t flex gap-2 no-print">
+                    <button onclick="downloadPDF()" class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex-1">PDF + Автосохранение</button>
+                    <button onclick="downloadExcel()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex-1">Excel + Автосохранение</button>
+                </div>
+                <div id="document-preview" class="bg-white border p-10 shadow-sm min-h-[842px] overflow-x-auto rounded-b-2xl">
+                    </div>
             </div>
         </div>
     </main>
 
-    <footer class="bg-gray-800 text-white text-center py-4 mt-auto">
-        <p>&copy; 2026 Doc-Maker.site. Все права защищены.</p>
-    </footer>
+    <div class="ads-box w-full mt-auto no-print">Место для рекламы - Bottom Footer Banner</div>
 
     <script src="supabase.js"></script>
     <script src="app.js"></script>
