@@ -10,7 +10,20 @@ const config = {
     'КР': { name: 'Кыргызстан', tax: 'ИНН', cur: 'KGS', flag: '🇰🇬', subunits: 'тыйын', curText: 'сомов' }
 };
 
-// --- СУММА ПРОПИСЬЮ (Улучшенная для больших чисел) ---
+// --- ВОССТАНОВЛЕНИЕ СЕССИИ ПРИ ОБНОВЛЕНИИ СТРАНИЦЫ ---
+window.addEventListener('DOMContentLoaded', async () => {
+    const { data: { session } } = await db.auth.getSession();
+    if (session) {
+        currentUser = session.user;
+        isGuest = false;
+        document.getElementById('user-display').innerText = currentUser.email;
+        document.getElementById('user-display').classList.remove('hidden');
+        document.getElementById('auto-save-hint').classList.remove('hidden');
+        startApp();
+    }
+});
+
+// --- СУММА ПРОПИСЬЮ ---
 function numberToWords(amount, country) {
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
@@ -66,21 +79,49 @@ function numberToWords(amount, country) {
 // --- АВТОРИЗАЦИЯ И СТАРТ ---
 document.getElementById('guest-btn').onclick = () => { isGuest = true; startApp(); };
 document.getElementById('login-btn').onclick = () => handleAuth('login');
-document.getElementById('reg-btn').onclick = () => handleAuth('signup');
-document.getElementById('logout-btn').onclick = () => location.reload();
+
+// Всплывающее окно регистрации
+document.getElementById('reg-btn').onclick = () => document.getElementById('reg-modal').classList.remove('hidden');
+window.closeRegModal = () => document.getElementById('reg-modal').classList.add('hidden');
+document.getElementById('submit-reg-btn').onclick = () => handleAuth('signup');
+
+document.getElementById('logout-btn').onclick = async () => {
+    await db.auth.signOut();
+    location.reload();
+};
 
 async function handleAuth(type) {
-    const email = document.getElementById('email-input').value;
-    const password = document.getElementById('password-input').value;
+    let email, password;
+    if (type === 'login') {
+        email = document.getElementById('email-input').value;
+        password = document.getElementById('password-input').value;
+    } else {
+        email = document.getElementById('reg-email').value;
+        password = document.getElementById('reg-password').value;
+    }
+
     if(!email || password.length < 6) return alert("Введите email и пароль от 6 символов");
 
     const { data, error } = (type === 'login') 
         ? await db.auth.signInWithPassword({ email, password })
         : await db.auth.signUp({ email, password });
 
-    if (error) alert(error.message);
-    else if (type === 'signup') alert("Регистрация успешна!");
-    else { currentUser = data.user; isGuest = false; startApp(); }
+    if (error) {
+        alert(error.message);
+    } else if (type === 'signup') {
+        alert("Регистрация успешна! Теперь вы можете войти.");
+        closeRegModal();
+    } else { 
+        currentUser = data.user; 
+        isGuest = false; 
+        
+        // Показываем email и подсказку
+        document.getElementById('user-display').innerText = currentUser.email;
+        document.getElementById('user-display').classList.remove('hidden');
+        document.getElementById('auto-save-hint').classList.remove('hidden');
+        
+        startApp(); 
+    }
 }
 
 function startApp() {
@@ -254,7 +295,6 @@ function updatePreview() {
             </div>
         `;
     } else {
-        // Упрощенный шаблон АВР (можно доработать по аналогии)
         html = `
             <div style="font-family: Arial, sans-serif; font-size: 11pt;">
                 <h2 style="text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 20px;">АКТ ВЫПОЛНЕННЫХ РАБОТ №${dNum} от ${dDate}</h2>
@@ -305,7 +345,6 @@ window.restoreFromHistory = (i) => {
     selectedCountry = i.country;
     docType = i.document_type;
     
-    // Восстанавливаем массив товаров или создаем пустой, если это старая запись
     if (i.items && Array.isArray(i.items)) {
         docItems = i.items;
     } else {
@@ -316,7 +355,6 @@ window.restoreFromHistory = (i) => {
     renderForm();
     renderItemsInputs();
     
-    // Заполняем все инпуты (если данные есть в БД)
     const setVal = (id, val) => { if(document.getElementById(id)) document.getElementById(id).value = val || ''; }
     
     setVal('doc-number', i.doc_number); setVal('doc-date', i.doc_date);
@@ -333,7 +371,10 @@ window.restoreFromHistory = (i) => {
 };
 
 async function downloadPDF() {
-    if(!isGuest) await saveToDB();
+    // Ждем окончания автосохранения перед конвертацией, если юзер авторизован
+    if(!isGuest && currentUser) {
+        await saveToDB();
+    }
     const element = document.getElementById('doc-render-area');
     html2pdf().from(element).set({ margin: [10, 5, 10, 5], filename: `Document.pdf`, html2canvas: { scale: 3 } }).save();
 }
@@ -364,9 +405,9 @@ async function saveToDB() {
         c_address: val('c-address'),
         c_contract: val('c-contract'),
         amount: totalAmount,
-        items: docItems // Сохраняем массив товаров в JSONB колонку
+        items: docItems
     };
     
     await db.from('invoices').insert([payload]);
-    loadHistory();
+    loadHistory(); // Обновляем историю сразу после сохранения
 }
