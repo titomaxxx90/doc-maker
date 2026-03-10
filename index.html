@@ -2,47 +2,94 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Doc-Maker.site</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doc-Maker.site | Счета и АВР</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        .doc-table th, .doc-table td { border: 1px solid black; padding: 4px 8px; font-size: 12px; }
+        @media print { .no-print { display: none; } }
+    </style>
 </head>
-<body class="bg-gray-100">
-    <header class="bg-slate-900 text-white p-4 flex justify-between items-center">
-        <h1 class="text-xl font-bold">DOC-MAKER.SITE</h1>
-        <button id="logout-btn" class="hidden bg-red-600 px-4 py-1 rounded">Выйти</button>
+<body class="bg-gray-100 min-h-screen font-sans">
+
+    <header class="bg-slate-900 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-black tracking-tighter">DOC-MAKER<span class="text-blue-400">.SITE</span></h1>
+            <button id="logout-btn" class="hidden bg-red-600 hover:bg-red-700 px-4 py-1 rounded text-sm transition">Выйти</button>
+        </div>
     </header>
 
-    <div class="container mx-auto mt-2 text-center text-xs text-gray-500 border-dashed border p-2 bg-white">Место для рекламы</div>
+    <div class="container mx-auto mt-3 no-print">
+        <div class="bg-white border-2 border-dashed border-gray-300 p-3 text-center text-gray-400 text-xs">Место для вашей рекламы (Google/Yandex)</div>
+    </div>
 
-    <main class="container mx-auto p-4 grid grid-cols-12 gap-6">
-        <div id="auth-box" class="col-span-12 max-w-lg mx-auto bg-white p-6 rounded shadow">
-            <h2 class="text-xl font-bold mb-4">Вход в систему</h2>
-            <p class="text-sm mb-4">Регистрация позволяет сохранять историю ваших документов.</p>
-            <div class="space-y-2">
-                <input id="email" type="email" placeholder="Email" class="w-full border p-2 rounded">
-                <input id="pass" type="password" placeholder="Пароль" class="w-full border p-2 rounded">
-                <button id="login-btn" class="w-full bg-blue-600 text-white py-2 rounded">Войти</button>
-                <button id="guest-btn" class="w-full bg-gray-600 text-white py-2 rounded">Вход как Гость</button>
+    <main class="container mx-auto p-4">
+        <section id="auth-section" class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-2xl mt-10 border border-gray-100">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-extrabold text-slate-800">Генератор документов</h2>
+                <p class="text-gray-500 mt-2">Создавайте профессиональные Счета и АВР за 1 минуту</p>
             </div>
-        </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-4">
+                    <h3 class="font-bold text-lg text-blue-600">Преимущества SaaS:</h3>
+                    <ul class="text-sm space-y-2 text-gray-600">
+                        <li>✅ Хранение всей истории документов</li>
+                        <li>✅ Автоподстановка ваших реквизитов</li>
+                        <li>✅ Доступ с любого устройства</li>
+                        <li>✅ Формы по стандартам РК, РФ, РБ, КР</li>
+                    </ul>
+                </div>
+                <div class="flex flex-col gap-3">
+                    <input type="email" id="email-input" placeholder="Ваш Email" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="password" id="password-input" placeholder="Пароль" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
+                    <button id="login-btn" class="bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">Войти / Регистрация</button>
+                    <div class="relative py-2"><div class="absolute inset-0 flex items-center"><span class="w-full border-t"></span></div><div class="relative flex justify-center text-xs uppercase"><span class="bg-white px-2 text-gray-400">Или</span></div></div>
+                    <button id="guest-btn" class="bg-slate-700 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition">Вход как Гость</button>
+                </div>
+            </div>
+        </section>
 
-        <div id="app-box" class="hidden col-span-12 lg:col-span-4 bg-white p-4 rounded shadow space-y-4">
-            <div class="flex gap-2">
-                <button onclick="setDoc('Счет')" class="flex-1 bg-blue-600 text-white py-2 rounded">Счет</button>
-                <button onclick="setDoc('АВР')" class="flex-1 bg-blue-600 text-white py-2 rounded">АВР</button>
-            </div>
-            <div id="country-btns" class="flex gap-1"></div>
-            <div id="form-fields" class="space-y-2"></div>
-            <div class="flex gap-2">
-                <button onclick="downloadPDF()" class="flex-1 bg-red-600 text-white py-2 rounded">PDF</button>
-                <button onclick="downloadExcel()" class="flex-1 bg-green-600 text-white py-2 rounded">Excel</button>
-            </div>
-        </div>
+        <section id="app-section" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div class="lg:col-span-4 space-y-4 no-print">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border">
+                    <div class="flex gap-2 mb-4">
+                        <button onclick="setDocType('Счет')" id="type-inv" class="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-sm">СЧЕТ</button>
+                        <button onclick="setDocType('АВР')" id="type-avr" class="flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-sm">АВР</button>
+                    </div>
+                    <div id="country-btns" class="grid grid-cols-4 gap-1"></div>
+                </div>
 
-        <div id="preview-box" class="hidden col-span-12 lg:col-span-8 bg-white p-8 shadow min-h-[600px]" id="doc-render">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border space-y-3">
+                    <h3 class="font-bold text-gray-700 border-b pb-2">Данные Поставщика</h3>
+                    <input type="text" id="p-name" placeholder="Ваша компания / ИП" class="w-full p-2 border rounded-lg text-sm" oninput="updatePreview()">
+                    <input type="text" id="p-tax" placeholder="Ваш ИНН/БИН" class="w-full p-2 border rounded-lg text-sm" oninput="updatePreview()">
+                </div>
+
+                <div id="dynamic-form" class="bg-white p-5 rounded-2xl shadow-sm border space-y-3">
+                    </div>
+
+                <div id="history-box" class="bg-white p-5 rounded-2xl shadow-sm border hidden">
+                    <h3 class="font-bold text-gray-700 mb-2">История</h3>
+                    <div id="history-list" class="text-xs space-y-2 max-h-40 overflow-y-auto text-gray-500">Загрузка...</div>
+                </div>
             </div>
+
+            <div class="lg:col-span-8 space-y-4">
+                <div class="bg-white p-3 rounded-xl border flex gap-3 no-print">
+                    <button onclick="downloadPDF()" class="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold hover:bg-red-700">PDF</button>
+                    <button onclick="downloadXLSX()" class="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700">Excel</button>
+                </div>
+                <div id="doc-render-area" class="bg-white shadow-2xl p-8 min-h-[800px] border border-gray-200 overflow-x-auto">
+                    </div>
+            </div>
+        </section>
     </main>
+
+    <script src="supabase.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
