@@ -1,50 +1,43 @@
-let currentUser = null;
-let selectedCountry = 'РК';
-let docType = 'Счет';
-let isGuest = false;
+let currentUser = null, selectedCountry = 'РК', docType = 'Счет', isGuest = false;
 
 const config = {
-    'РК': { tax: 'БИН/ИИН', bank: 'ИИК (IBAN)', extra: 'КБЕ', cur: 'тенге' },
-    'РФ': { tax: 'ИНН', bank: 'Р/С', extra: 'БИК', cur: 'руб.' },
-    'РБ': { tax: 'УНП', bank: 'IBAN', extra: 'Код банка', cur: 'бел. руб.' },
-    'КР': { tax: 'ИНН', bank: 'Р/С', extra: 'БИК', cur: 'сом' }
+    'РК': { tax: 'БИН/ИИН', bank: 'ИИК', cur: 'тенге', label: 'Казахстан' },
+    'РФ': { tax: 'ИНН/КПП', bank: 'Р/С', cur: 'руб.', label: 'Россия' },
+    'РБ': { tax: 'УНП', bank: 'IBAN', cur: 'бел. руб.', label: 'Беларусь' },
+    'КР': { tax: 'ИНН', bank: 'Р/С', cur: 'сом', label: 'Кыргызстан' }
 };
 
-// 1. Инициализация входа
+// --- AUTH ---
 document.getElementById('guest-btn').onclick = () => { isGuest = true; startApp(); };
-
-document.getElementById('login-btn').onclick = async () => {
-    const email = document.getElementById('email-input').value;
-    const password = document.getElementById('password-input').value;
-    if(!email || !password) return alert("Введите данные");
-
-    const { data, error } = await db.auth.signInWithPassword({ email, password });
-    if (error) {
-        const reg = await db.auth.signUp({ email, password });
-        if (reg.error) alert(reg.error.message); else alert("Аккаунт создан! Войдите еще раз.");
-    } else {
-        currentUser = data.user;
-        isGuest = false;
-        startApp();
-    }
-};
-
+document.getElementById('login-btn').onclick = () => handleAuth('login');
+document.getElementById('reg-btn').onclick = () => handleAuth('signup');
 document.getElementById('logout-btn').onclick = () => location.reload();
 
-// 2. Запуск приложения
+async function handleAuth(type) {
+    const email = document.getElementById('email-input').value;
+    const password = document.getElementById('password-input').value;
+    if(!email || password.length < 6) return alert("Email и пароль (мин. 6 знаков) обязательны");
+
+    const { data, error } = (type === 'login') 
+        ? await db.auth.signInWithPassword({ email, password })
+        : await db.auth.signUp({ email, password });
+
+    if (error) alert(error.message);
+    else if (type === 'signup') alert("Регистрация успешна! Теперь войдите.");
+    else { currentUser = data.user; isGuest = false; startApp(); }
+}
+
+// --- APP CORE ---
 function startApp() {
     document.getElementById('auth-section').classList.add('hidden');
     document.getElementById('app-section').classList.remove('hidden');
     document.getElementById('logout-btn').classList.remove('hidden');
     
-    if (!isGuest) {
-        document.getElementById('history-box').classList.remove('hidden');
-        loadHistory();
-    }
+    if(!isGuest) { document.getElementById('history-box').classList.remove('hidden'); loadHistory(); }
     
-    // Загрузка сохраненного поставщика
     document.getElementById('p-name').value = localStorage.getItem('p_name') || '';
     document.getElementById('p-tax').value = localStorage.getItem('p_tax') || '';
+    document.getElementById('p-bank').value = localStorage.getItem('p_bank') || '';
 
     renderCountryBtns();
     renderForm();
@@ -52,9 +45,8 @@ function startApp() {
 }
 
 function renderCountryBtns() {
-    const cont = document.getElementById('country-btns');
-    cont.innerHTML = Object.keys(config).map(c => `
-        <button onclick="setCountry('${c}')" class="p-2 rounded border text-xs font-bold ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50'}">${c}</button>
+    document.getElementById('country-btns').innerHTML = Object.keys(config).map(c => `
+        <button onclick="setCountry('${c}')" class="p-1 rounded border text-[10px] font-bold ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50'}">${c}</button>
     `).join('');
 }
 
@@ -62,100 +54,127 @@ window.setCountry = (c) => { selectedCountry = c; renderCountryBtns(); renderFor
 
 window.setDocType = (type) => {
     docType = type;
-    document.getElementById('type-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-sm' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-sm';
-    document.getElementById('type-avr').className = type === 'АВР' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-sm' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-sm';
+    document.getElementById('btn-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs';
+    document.getElementById('btn-avr').className = type === 'АВР' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs';
     updatePreview();
 };
 
 function renderForm() {
     const f = config[selectedCountry];
     document.getElementById('dynamic-form').innerHTML = `
-        <h3 class="font-bold text-gray-700 border-b pb-2">Данные Клиента</h3>
-        <input type="text" id="c-name" placeholder="Наименование клиента" class="w-full p-2 border rounded-lg text-sm" oninput="updatePreview()">
-        <input type="text" id="c-tax" placeholder="${f.tax} клиента" class="w-full p-2 border rounded-lg text-sm" oninput="updatePreview()">
-        <input type="text" id="c-bank" placeholder="${f.bank} клиента" class="w-full p-2 border rounded-lg text-sm" oninput="updatePreview()">
-        <input type="number" id="val-amount" placeholder="Сумма" class="w-full p-2 border rounded-lg text-sm font-bold" oninput="updatePreview()">
-        <textarea id="val-desc" placeholder="Назначение платежа / Список услуг" class="w-full p-2 border rounded-lg text-sm" oninput="updatePreview()"></textarea>
+        <h3 class="font-bold text-gray-700 text-sm">Данные Клиента</h3>
+        <input type="text" id="c-name" placeholder="Наименование организации" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+        <input type="text" id="c-tax" placeholder="${f.tax} клиента" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+        <input type="number" id="val-amount" placeholder="Сумма" class="w-full p-2 border rounded text-xs font-bold" oninput="updatePreview()">
+        <textarea id="val-desc" rows="3" placeholder="Описание услуг" class="w-full p-2 border rounded text-xs" oninput="updatePreview()"></textarea>
     `;
 }
 
-// 3. Генерация дизайна
+// --- PROFESSIONAL TEMPLATES ---
 function updatePreview() {
-    const pn = document.getElementById('p-name').value || '________________';
-    const pt = document.getElementById('p-tax').value || '________________';
-    const cn = document.getElementById('c-name')?.value || '________________';
-    const ct = document.getElementById('c-tax')?.value || '________________';
-    const cb = document.getElementById('c-bank')?.value || '________________';
-    const am = document.getElementById('val-amount')?.value || '0';
-    const ds = document.getElementById('val-desc')?.value || 'Консультационные услуги';
+    const pName = document.getElementById('p-name').value || 'ИП Иванов И.И.';
+    const pTax = document.getElementById('p-tax').value || '123456789012';
+    const pBank = document.getElementById('p-bank').value || 'АО "Банк", ИИК: KZ000...';
+    const cName = document.getElementById('c-name')?.value || 'ТОО "Заказчик"';
+    const cTax = document.getElementById('c-tax')?.value || '987654321098';
+    const amount = document.getElementById('val-amount')?.value || '0';
+    const desc = document.getElementById('val-desc')?.value || 'Информационные услуги';
     const f = config[selectedCountry];
 
-    localStorage.setItem('p_name', pn);
-    localStorage.setItem('p_tax', pt);
+    localStorage.setItem('p_name', pName);
+    localStorage.setItem('p_tax', pTax);
+    localStorage.setItem('p_bank', pBank);
 
-    document.getElementById('doc-render-area').innerHTML = `
-        <div id="printable-doc" style="font-family: Arial; color: black; line-height: 1.2;">
-            <div style="text-align: center; border-bottom: 2px solid black; margin-bottom: 20px; padding-bottom: 10px;">
-                <h1 style="font-size: 18px; font-weight: bold;">${docType.toUpperCase()} №___ от ${new Date().toLocaleDateString()}</h1>
+    let template = '';
+
+    if (docType === 'Счет') {
+        template = `
+            <div style="font-size: 11pt;">
+                <div style="border: 1px solid black; padding: 5px; margin-bottom: 20px; font-size: 10pt;">
+                    <strong>Банк Поставщика:</strong> ${pBank}
+                </div>
+                <h2 style="text-align: center; font-weight: bold; border-bottom: 2px solid black; padding-bottom: 5px;">
+                    Счет на оплату №${Math.floor(Date.now()/100000)} от ${new Date().toLocaleDateString()}
+                </h2>
+                <div style="margin: 20px 0;">
+                    <p><strong>Поставщик:</strong> ${pName}, ${f.tax}: ${pTax}</p>
+                    <p><strong>Покупатель:</strong> ${cName}, ${f.tax}: ${cTax}</p>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead>
+                        <tr style="background: #eee;">
+                            <th class="border-black">№</th><th class="border-black">Наименование товара/услуги</th><th class="border-black">Кол-во</th><th class="border-black">Сумма</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="border-black text-center">1</td><td class="border-black">${desc}</td><td class="border-black text-center">1</td><td class="border-black text-right">${amount}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="text-align: right; font-weight: bold; margin-top: 10px;">ИТОГО К ОПЛАТЕ: ${amount} ${f.cur}</p>
+                <div style="margin-top: 50px; border-top: 1px solid #ccc; padding-top: 20px;">
+                    Руководитель: ________________ / ${pName} / <br><br> Бухгалтер: ________________
+                </div>
             </div>
-            
-            <table style="width: 100%; margin-bottom: 20px; font-size: 13px;">
-                <tr><td style="width: 120px;"><strong>Поставщик:</strong></td><td>${pn}, ${f.tax}: ${pt}</td></tr>
-                <tr><td><strong>Покупатель:</strong></td><td>${cn}, ${f.tax}: ${ct}, ${f.bank}: ${cb}</td></tr>
-            </table>
-
-            <table class="doc-table" style="width: 100%; border-collapse: collapse;">
-                <tr style="background: #f0f0f0;">
-                    <th>№</th><th>Наименование работ, услуг</th><th>Сумма (${f.cur})</th>
-                </tr>
-                <tr>
-                    <td style="text-align: center;">1</td><td>${ds}</td><td style="text-align: right;">${am}</td>
-                </tr>
-            </table>
-
-            <div style="text-align: right; margin-top: 15px; font-size: 16px;">
-                <strong>ИТОГО: ${am} ${f.cur}</strong>
+        `;
+    } else {
+        template = `
+            <div style="font-size: 11pt;">
+                <h2 style="text-align: center; font-weight: bold;">АКТ ВЫПОЛНЕННЫХ РАБОТ (ОКАЗАННЫХ УСЛУГ)</h2>
+                <p style="text-align: center;">от ${new Date().toLocaleDateString()}</p>
+                <div style="margin: 20px 0; border-top: 1px solid black; padding-top: 10px;">
+                    <p><strong>Исполнитель:</strong> ${pName}</p>
+                    <p><strong>Заказчик:</strong> ${cName}</p>
+                </div>
+                <p>Мы, нижеподписавшиеся, составили настоящий Акт о том, что Исполнителем были оказаны следующие услуги:</p>
+                <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                    <tr style="background: #eee;">
+                        <th class="border-black">Наименование работ</th><th class="border-black">Сумма</th>
+                    </tr>
+                    <tr>
+                        <td class="border-black">${desc}</td><td class="border-black text-right">${amount}</td>
+                    </tr>
+                </table>
+                <p>Вышеуказанные услуги выполнены полностью и в срок. Заказчик претензий по объему, качеству и срокам оказания услуг не имеет.</p>
+                <div style="margin-top: 40px; display: flex; justify-content: space-between;">
+                    <div style="width: 45%;"><strong>Исполнитель:</strong><br><br>________________ / ${pName}</div>
+                    <div style="width: 45%;"><strong>Заказчик:</strong><br><br>________________ / ${cName}</div>
+                </div>
             </div>
-
-            <div style="margin-top: 60px; display: flex; justify-content: space-between; font-size: 13px;">
-                <div>Поставщик: ________________ / ${pn}</div>
-                <div>Получил: ________________ / ${cn}</div>
-            </div>
-        </div>
-    `;
+        `;
+    }
+    document.getElementById('doc-render-area').innerHTML = template;
 }
 
-// 4. Экспорт и Сохранение
+// --- EXPORT ---
 async function downloadPDF() {
     if(!isGuest) await saveToDB();
-    const element = document.getElementById('printable-doc');
-    html2pdf().from(element).set({ margin: 10, filename: `${docType}.pdf` }).save();
+    const element = document.getElementById('doc-render-area');
+    html2pdf().from(element).set({ margin: 10, filename: `${docType}.pdf`, html2canvas: { scale: 2 } }).save();
 }
 
 async function downloadXLSX() {
     if(!isGuest) await saveToDB();
     const data = [
-        [docType, "Дата", new Date().toLocaleDateString()],
-        ["Поставщик", document.getElementById('p-name').value],
-        ["Клиент", document.getElementById('c-name').value],
-        ["Сумма", document.getElementById('val-amount').value, config[selectedCountry].cur]
+        ["ДОКУМЕНТ", docType], ["ДАТА", new Date().toLocaleDateString()],
+        ["ПОСТАВЩИК", document.getElementById('p-name').value],
+        ["КЛИЕНТ", document.getElementById('c-name').value],
+        ["УСЛУГА", document.getElementById('val-desc').value],
+        ["ИТОГО", document.getElementById('val-amount').value, config[selectedCountry].cur]
     ];
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Document");
+    XLSX.utils.book_append_sheet(wb, ws, "Doc");
     XLSX.writeFile(wb, `${docType}.xlsx`);
 }
 
 async function saveToDB() {
     const payload = {
-        user_id: currentUser.id,
-        country: selectedCountry,
+        user_id: currentUser.id, country: selectedCountry,
         client_name: document.getElementById('c-name').value,
-        tax_id: document.getElementById('c-tax').value,
         amount: parseFloat(document.getElementById('val-amount').value) || 0,
-        document_type: docType,
-        provider_name: document.getElementById('p-name').value,
-        provider_tax_id: document.getElementById('p-tax').value
+        document_type: docType, provider_name: document.getElementById('p-name').value
     };
     await db.from('invoices').insert([payload]);
     loadHistory();
@@ -166,21 +185,9 @@ async function loadHistory() {
     const cont = document.getElementById('history-list');
     if (data && data.length > 0) {
         cont.innerHTML = data.map(i => `
-            <div onclick='restoreHistory(${JSON.stringify(i)})' class="p-2 border rounded bg-gray-50 hover:bg-blue-50 cursor-pointer">
-                <b>${i.document_type}</b>: ${i.client_name} (${i.amount})
+            <div class="text-[9px] p-1 border rounded bg-gray-50 mb-1">
+                ${i.document_type}: ${i.client_name} (${i.amount})
             </div>
         `).join('');
-    } else {
-        cont.innerText = "История пуста";
     }
 }
-
-window.restoreHistory = (i) => {
-    selectedCountry = i.country;
-    docType = i.document_type;
-    renderForm();
-    document.getElementById('c-name').value = i.client_name;
-    document.getElementById('c-tax').value = i.tax_id;
-    document.getElementById('val-amount').value = i.amount;
-    updatePreview();
-};
