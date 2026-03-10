@@ -4,13 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Doc-Maker.site | Генератор Счетов и АВР</title>
-    <meta name="description" content="Сервис для быстрого создания счетов и актов выполненных работ онлайн по стандартам СНГ.">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        .doc-paper { font-family: "Times New Roman", serif; color: black; line-height: 1.2; }
-        .border-black { border: 1px solid black; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -31,24 +28,17 @@
             <div class="p-8 bg-slate-50 border-r">
                 <h2 class="text-2xl font-bold mb-6 text-slate-800">О сервисе Doc-Maker.site</h2>
                 <div class="space-y-4 text-sm text-gray-600 leading-relaxed">
-                    <p><strong>Doc-Maker.site</strong> — это удобный сервис для предпринимателей, который позволяет мгновенно создавать счета на оплату и акты выполненных работ.</p>
-                    <ul class="space-y-2">
-                        <li>• <strong>Стандарты:</strong> Документы соответствуют требованиям Казахстана, России, Беларуси и Кыргызстана.</li>
-                        <li>• <strong>История:</strong> Все созданные документы сохраняются в вашем личном облаке.</li>
-                        <li>• <strong>Удобный поиск:</strong> Раздельные списки для счетов и актов с быстрой прокруткой.</li>
-                        <li>• <strong>Гибкость:</strong> Вводите номера и даты вручную или выбирайте старые записи из базы.</li>
-                    </ul>
+                    <p>Профессиональный генератор счетов и актов, соответствующих стандартам СНГ.</p>
                 </div>
             </div>
             <div class="p-8 space-y-4 flex flex-col justify-center">
-                <h2 class="text-xl font-bold text-center mb-2">Вход / Регистрация</h2>
-                <input type="email" id="email-input" placeholder="Ваш Email" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
-                <input type="password" id="password-input" placeholder="Пароль" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="email" id="email-input" placeholder="Email" class="w-full p-3 border rounded-xl outline-none">
+                <input type="password" id="password-input" placeholder="Пароль" class="w-full p-3 border rounded-xl outline-none">
                 <div class="grid grid-cols-2 gap-2">
-                    <button id="login-btn" class="bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">Войти</button>
-                    <button id="reg-btn" class="bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 transition">Регистрация</button>
+                    <button id="login-btn" class="bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700">Войти</button>
+                    <button id="reg-btn" class="bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700">Регистрация</button>
                 </div>
-                <button id="guest-btn" class="w-full bg-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-300 transition">Войти как Гость</button>
+                <button id="guest-btn" class="w-full bg-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-300">Войти как Гость</button>
             </div>
         </section>
 
@@ -56,14 +46,14 @@
             <div class="lg:col-span-4 space-y-4 no-print">
                 <div class="bg-white p-4 rounded-xl shadow border">
                     <div class="flex gap-2 mb-4">
-                        <button onclick="setDocType('Счет')" id="btn-inv" class="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs">СЧЕТ</button>
-                        <button onclick="setDocType('АВР')" id="btn-avr" class="flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs">АВР</button>
+                        <button onclick="setDocType('Счет')" id="btn-inv" class="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase">СЧЕТ</button>
+                        <button onclick="setDocType('АВР')" id="btn-avr" class="flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase">АВР</button>
                     </div>
-                    <div id="country-btns" class="grid grid-cols-4 gap-1"></div>
+                    <div id="country-btns" class="grid grid-cols-2 md:grid-cols-4 gap-1"></div>
                 </div>
 
                 <div class="bg-white p-4 rounded-xl shadow border space-y-2">
-                    <h3 class="font-bold text-gray-700 text-xs">Информация о документе</h3>
+                    <h3 class="font-bold text-gray-700 text-xs">Документ</h3>
                     <div class="grid grid-cols-2 gap-2">
                         <input type="text" id="doc-number" placeholder="№ док-та" class="p-2 border rounded text-xs" oninput="updatePreview()">
                         <input type="date" id="doc-date" class="p-2 border rounded text-xs" oninput="updatePreview()">
@@ -72,36 +62,53 @@
 
                 <div class="bg-white p-4 rounded-xl shadow border space-y-2">
                     <h3 class="font-bold text-gray-700 text-xs">Ваши реквизиты (Поставщик)</h3>
-                    <input type="text" id="p-name" placeholder="Название вашей компании" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                    <input type="text" id="p-name" placeholder="Название вашей компании (Бенефициар)" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
                     <input type="text" id="p-tax" placeholder="Ваш БИН / ИНН" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
-                    <input type="text" id="p-bank" placeholder="Ваш банк и реквизиты" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
-                    <div id="staff-fields" class="space-y-2"></div>
+                    <input type="text" id="p-address" placeholder="Ваш адрес (Страна, Город, Улица)" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                    <hr class="my-2">
+                    <input type="text" id="p-bank" placeholder="Наименование Банка" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                    <input type="text" id="p-iik" placeholder="ИИК (Ваш расчетный счет)" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                    <div class="grid grid-cols-3 gap-2">
+                        <input type="text" id="p-bik" placeholder="БИК" class="p-2 border rounded text-xs" oninput="updatePreview()">
+                        <input type="text" id="p-kbe" placeholder="КБе" class="p-2 border rounded text-xs" oninput="updatePreview()">
+                        <input type="text" id="p-knp" placeholder="КНП" class="p-2 border rounded text-xs" oninput="updatePreview()">
+                    </div>
+                    <div id="staff-fields" class="space-y-2 mt-2"></div>
                 </div>
 
-                <div id="dynamic-form" class="bg-white p-4 rounded-xl shadow border space-y-2"></div>
+                <div class="bg-white p-4 rounded-xl shadow border space-y-2">
+                    <h3 class="font-bold text-gray-700 text-xs">Данные Клиента</h3>
+                    <input type="text" id="c-name" placeholder="Название клиента" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                    <input type="text" id="c-tax" placeholder="БИН / ИНН клиента" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                    <input type="text" id="c-address" placeholder="Адрес клиента" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                    <input type="text" id="c-contract" placeholder="Договор (если есть)" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                </div>
+
+                <div class="bg-white p-4 rounded-xl shadow border space-y-2">
+                    <h3 class="font-bold text-gray-700 text-xs flex justify-between items-center">
+                        Позиции (Товары / Услуги)
+                        <button onclick="addItem()" class="text-blue-600 hover:text-blue-800 text-[10px]">+ Добавить</button>
+                    </h3>
+                    <div id="items-container" class="space-y-2"></div>
+                </div>
 
                 <div id="history-box" class="bg-white rounded-xl shadow border hidden flex flex-col overflow-hidden max-h-[350px]">
                     <div class="flex bg-gray-100 border-b">
-                        <button onclick="switchHistoryTab('Счет')" id="tab-h-inv" class="flex-1 py-2 text-[10px] font-bold bg-white text-blue-600 border-r">СЧЕТА</button>
-                        <button onclick="switchHistoryTab('АВР')" id="tab-h-avr" class="flex-1 py-2 text-[10px] font-bold text-gray-400">АКТЫ</button>
+                        <button onclick="switchHistoryTab('Счет')" id="tab-h-inv" class="flex-1 py-2 text-[10px] font-bold bg-white text-blue-600 border-r shadow-inner">СЧЕТА</button>
+                        <button onclick="switchHistoryTab('АВР')" id="tab-h-avr" class="flex-1 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600">АКТЫ</button>
                     </div>
                     <div id="history-list" class="p-2 space-y-2 overflow-y-auto custom-scrollbar"></div>
                 </div>
             </div>
 
             <div class="lg:col-span-8 space-y-4">
-                <button onclick="downloadPDF()" class="no-print w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow-lg">СКАЧАТЬ В PDF</button>
-                <div id="doc-render-area" class="bg-white p-12 shadow-2xl min-h-[1000px] border border-gray-300 doc-paper overflow-x-auto"></div>
+                <button onclick="downloadPDF()" class="no-print w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 shadow-lg">СКАЧАТЬ В PDF</button>
+                <div id="doc-render-area" class="bg-white p-10 shadow-2xl min-h-[1000px] border border-gray-300 overflow-x-auto"></div>
             </div>
         </section>
     </main>
-
-    <footer class="bg-slate-900 text-white/50 py-4 text-center text-xs no-print mt-auto">
-        © 2026 Doc-Maker.site
-    </footer>
 
     <script src="supabase.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
-
