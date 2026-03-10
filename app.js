@@ -1,212 +1,171 @@
-// app.js — Логика приложения Doc-Maker.site
-// Кодировка: UTF-8
-
-// --- 1. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+// app.js
 let currentUser = null;
-let selectedCountry = 'РК'; // По умолчанию Казахстан
+let selectedCountry = 'РК';
+let docType = 'Счет'; // 'Счет' или 'АВР'
 
-// Настройки полей для разных стран
-const countrySettings = {
-    'РК': { taxLabel: 'БИН/ИИН', bankLabel: 'ИИК (IBAN)', extraLabel: 'КБЕ', currency: 'тенге' },
-    'РФ': { taxLabel: 'ИНН/КПП', bankLabel: 'Расчетный счет', extraLabel: 'БИК', currency: 'рублей' },
-    'РБ': { taxLabel: 'УНП', bankLabel: 'IBAN', extraLabel: 'Код банка', currency: 'бел. руб.' },
-    'КР': { taxLabel: 'ИНН', bankLabel: 'Расчетный счет', extraLabel: 'БИК', currency: 'сом' }
+const config = {
+    'РК': { tax: 'БИН/ИИН', bank: 'ИИК (IBAN)', extra: 'КБЕ', cur: 'тенге', name: 'Казахстан' },
+    'РФ': { tax: 'ИНН/КПП', bank: 'Р/С', extra: 'БИК', cur: 'руб.', name: 'Россия' },
+    'РБ': { tax: 'УНП', bank: 'IBAN', extra: 'Код банка', cur: 'бел. руб.', name: 'Беларусь' },
+    'КР': { tax: 'ИНН', bank: 'Р/С', extra: 'БИК', cur: 'сом', name: 'Кыргызстан' }
 };
 
-// --- 2. АВТОРИЗАЦИЯ ---
-
-const authSection = document.getElementById('auth-section');
-const appSection = document.getElementById('app-section');
-const authMessage = document.getElementById('auth-message');
-
-// Функция регистрации
-document.getElementById('register-btn').onclick = async () => {
-    const email = document.getElementById('email-input').value;
-    const password = document.getElementById('password-input').value;
-
-    if (!email || !password) return showMessage('Заполните все поля', 'red');
-
-    const { data, error } = await db.auth.signUp({ email, password });
-    
-    if (error) {
-        showMessage('Ошибка: ' + error.message, 'red');
-    } else {
-        showMessage('Аккаунт создан! Теперь нажмите "Войти"', 'green');
-    }
-};
-
-// Функция входа
+// --- AUTH LOGIC ---
 document.getElementById('login-btn').onclick = async () => {
     const email = document.getElementById('email-input').value;
     const password = document.getElementById('password-input').value;
-
     const { data, error } = await db.auth.signInWithPassword({ email, password });
-
     if (error) {
-        showMessage('Ошибка входа: ' + error.message, 'red');
+        const reg = await db.auth.signUp({ email, password }); // Авто-регистрация для удобства
+        if (reg.error) alert(reg.error.message); else alert("Аккаунт создан! Войдите еще раз.");
     } else {
         currentUser = data.user;
-        startApp();
+        initApp();
     }
 };
 
-function showMessage(text, color) {
-    authMessage.innerText = text;
-    authMessage.style.color = color;
-    authMessage.classList.remove('hidden');
-}
-
-// Выход
-document.getElementById('logout-btn').onclick = async () => {
-    await db.auth.signOut();
-    location.reload();
-};
-
-// --- 3. ИНТЕРФЕЙС ПРИЛОЖЕНИЯ ---
-
-function startApp() {
-    authSection.classList.add('hidden');
-    appSection.classList.remove('hidden');
+function initApp() {
+    document.getElementById('auth-section').classList.add('hidden');
+    document.getElementById('app-section').classList.remove('hidden');
     document.getElementById('user-info').classList.remove('hidden');
     document.getElementById('user-email').innerText = currentUser.email;
+    renderCountryBtns();
     renderForm();
-    updatePreview(); // Показать пустой шаблон сразу
+    loadHistory();
+}
+
+// --- UI LOGIC ---
+function renderCountryBtns() {
+    const cont = document.getElementById('country-btns');
+    cont.innerHTML = Object.keys(config).map(c => `
+        <button onclick="changeCountry('${c}')" class="p-2 rounded border text-xs font-bold ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50'}">${c}</button>
+    `).join('');
+}
+
+function setDocType(type) {
+    docType = type;
+    document.getElementById('btn-type-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-600 text-sm font-bold';
+    document.getElementById('btn-type-avr').className = type === 'АВР' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-600 text-sm font-bold';
+    updatePreview();
+}
+
+function changeCountry(c) {
+    selectedCountry = c;
+    renderCountryBtns();
+    renderForm();
+    updatePreview();
 }
 
 function renderForm() {
-    const area = document.getElementById('dynamic-form-area');
-    const s = countrySettings[selectedCountry];
-
-    area.innerHTML = `
-        <div class="flex flex-wrap gap-2 mb-6">
-            ${['РК', 'РФ', 'РБ', 'КР'].map(c => `
-                <button onclick="changeCountry('${c}')" class="flex-1 py-2 rounded-md font-bold transition ${selectedCountry === c ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}">
-                    ${c}
-                </button>
-            `).join('')}
-        </div>
-        
-        <div class="space-y-3">
-            <input type="text" id="f-client" placeholder="Наименование организации клиента" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-            <div class="grid grid-cols-2 gap-3">
-                <input type="text" id="f-taxid" placeholder="${s.taxLabel}" class="w-full p-3 border rounded-lg outline-none">
-                <input type="text" id="f-extra" placeholder="${s.extraLabel}" class="w-full p-3 border rounded-lg outline-none">
-            </div>
-            <input type="text" id="f-bank" placeholder="${s.bankLabel}" class="w-full p-3 border rounded-lg outline-none">
-            <input type="number" id="f-amount" placeholder="Сумма к оплате" class="w-full p-3 border rounded-lg outline-none font-bold text-blue-700">
-            <textarea id="f-desc" rows="3" placeholder="За что оплата (услуги/товары)" class="w-full p-3 border rounded-lg outline-none"></textarea>
-            
-            <button onclick="updatePreview()" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-bold shadow-lg transition transform active:scale-95">
-                Обновить предпросмотр
-            </button>
-        </div>
+    const f = config[selectedCountry];
+    const cont = document.getElementById('dynamic-form');
+    cont.innerHTML = `
+        <h3 class="font-bold mb-3 text-gray-700">3. Данные клиента</h3>
+        <input type="text" id="c-name" placeholder="Клиент" class="w-full p-2 mb-2 border rounded-lg text-sm" oninput="updatePreview()">
+        <input type="text" id="c-tax" placeholder="${f.tax}" class="w-full p-2 mb-2 border rounded-lg text-sm" oninput="updatePreview()">
+        <input type="text" id="c-bank" placeholder="${f.bank}" class="w-full p-2 mb-2 border rounded-lg text-sm" oninput="updatePreview()">
+        <input type="number" id="val-amount" placeholder="Сумма" class="w-full p-2 mb-2 border rounded-lg text-sm font-bold" oninput="updatePreview()">
+        <textarea id="val-desc" placeholder="Предмет договора" class="w-full p-2 border rounded-lg text-sm" oninput="updatePreview()"></textarea>
     `;
 }
 
-window.changeCountry = (c) => {
-    selectedCountry = c;
+// --- GENERATION & PREVIEW ---
+function updatePreview() {
+    const pName = document.getElementById('p-name').value || 'ИП Иванов И.И.';
+    const pTax = document.getElementById('p-tax').value || '1234567890';
+    const cName = document.getElementById('c-name')?.value || 'ТОО "Покупатель"';
+    const amount = document.getElementById('val-amount')?.value || '0';
+    const desc = document.getElementById('val-desc')?.value || 'За разработку ПО';
+    const f = config[selectedCountry];
+
+    const html = `
+        <div id="pdf-area" style="font-family: 'Arial', sans-serif; color: #000; font-size: 12px;">
+            <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 15px;">
+                <h1 style="font-size: 18px; font-weight: bold; margin: 0;">${docType === 'Счет' ? 'СЧЕТ НА ОПЛАТУ' : 'АКТ ВЫПОЛНЕННЫХ РАБОТ'} №___ от ${new Date().toLocaleDateString()}</h1>
+            </div>
+            <table style="width: 100%; margin-bottom: 20px;">
+                <tr><td style="width: 100px; vertical-align: top;"><strong>Исполнитель:</strong></td><td>${pName}, ${f.tax}: ${pTax}</td></tr>
+                <tr><td style="vertical-align: top;"><strong>Заказчик:</strong></td><td>${cName}</td></tr>
+            </table>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <tr style="background: #eee;">
+                    <th style="border: 1px solid #000; padding: 5px;">Наименование работ/услуг</th>
+                    <th style="border: 1px solid #000; padding: 5px; width: 100px;">Сумма (${f.cur})</th>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 5px;">${desc}</td>
+                    <td style="border: 1px solid #000; padding: 5px; text-align: right;">${amount}</td>
+                </tr>
+            </table>
+            <div style="text-align: right; font-weight: bold; font-size: 14px;">ИТОГО К ОПЛАТЕ: ${amount} ${f.cur}</div>
+            <div style="margin-top: 40px; display: flex; justify-content: space-between;">
+                <div>_________________ / ${pName}</div>
+                <div>_________________ / ${cName}</div>
+            </div>
+        </div>
+    `;
+    document.getElementById('document-preview').innerHTML = html;
+}
+
+// --- ACTIONS ---
+async function saveToDB() {
+    const payload = {
+        user_id: currentUser.id,
+        country: selectedCountry,
+        client_name: document.getElementById('c-name').value,
+        tax_id: document.getElementById('c-tax').value,
+        amount: parseFloat(document.getElementById('val-amount').value) || 0,
+        document_type: docType,
+        provider_name: document.getElementById('p-name').value,
+        provider_tax_id: document.getElementById('p-tax').value,
+        document_data: { desc: document.getElementById('val-desc').value }
+    };
+    await db.from('invoices').insert([payload]);
+    loadHistory();
+}
+
+async function loadHistory() {
+    const { data } = await db.from('invoices').select('*').order('created_at', { ascending: false }).limit(5);
+    const cont = document.getElementById('history-list');
+    if (data) {
+        cont.innerHTML = data.map(i => `
+            <div class="p-2 border rounded bg-gray-50 cursor-pointer hover:bg-blue-50" onclick="restoreFromHistory(${JSON.stringify(i).replace(/"/g, '&quot;')})">
+                <b>${i.document_type}</b>: ${i.client_name} - ${i.amount}
+            </div>
+        `).join('');
+    }
+}
+
+window.restoreFromHistory = (item) => {
+    selectedCountry = item.country;
+    docType = item.document_type;
     renderForm();
+    document.getElementById('p-name').value = item.provider_name || '';
+    document.getElementById('p-tax').value = item.provider_tax_id || '';
+    document.getElementById('c-name').value = item.client_name;
+    document.getElementById('c-tax').value = item.tax_id;
+    document.getElementById('val-amount').value = item.amount;
+    document.getElementById('val-desc').value = item.document_data?.desc || '';
     updatePreview();
 };
 
-// --- 4. ШАБЛОН И ЭКСПОРТ ---
-
-function updatePreview() {
-    const client = document.getElementById('f-client')?.value || '[Название клиента]';
-    const amount = document.getElementById('f-amount')?.value || '0.00';
-    const taxId = document.getElementById('f-taxid')?.value || '___';
-    const desc = document.getElementById('f-desc')?.value || 'Консультационные услуги';
-    const s = countrySettings[selectedCountry];
-
-    const preview = document.getElementById('document-preview');
-    
-    // Современный чистый шаблон счета
-    preview.innerHTML = `
-        <div id="invoice-render" style="padding: 20px; color: #000; line-height: 1.5;">
-            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 10px;">
-                <h1 style="font-size: 20px; text-transform: uppercase;">Счет на оплату №${Math.floor(Math.random() * 1000)}</h1>
-                <p>Дата: ${new Date().toLocaleDateString()}</p>
-            </div>
-            
-            <div style="margin-top: 20px;">
-                <p><strong>Поставщик:</strong> Пользователь системы Doc-Maker (${currentUser.email})</p>
-                <p><strong>Покупатель:</strong> ${client} (${s.taxLabel}: ${taxId})</p>
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse; margin-top: 30px;">
-                <thead>
-                    <tr style="background: #f4f4f4;">
-                        <th style="border: 1px solid #000; padding: 10px; text-align: left;">Описание услуг</th>
-                        <th style="border: 1px solid #000; padding: 10px; text-align: right; width: 120px;">Сумма</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="border: 1px solid #000; padding: 10px;">${desc}</td>
-                        <td style="border: 1px solid #000; padding: 10px; text-align: right;">${amount}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div style="margin-top: 20px; text-align: right;">
-                <p style="font-size: 18px;"><strong>ИТОГО К ОПЛАТЕ: ${amount} ${s.currency}</strong></p>
-            </div>
-
-            <div style="margin-top: 50px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 12px;">
-                <p>Банковские реквизиты: ${s.bankLabel} ${document.getElementById('f-bank')?.value || '___'}</p>
-                <p>Страна юрисдикции: ${selectedCountry}</p>
-            </div>
-        </div>
-    `;
+async function downloadPDF() {
+    await saveToDB();
+    const element = document.getElementById('pdf-area');
+    html2pdf().from(element).save(`${docType}_${Date.now()}.pdf`);
 }
 
-// Экспорт PDF
-document.getElementById('export-pdf-btn').onclick = () => {
-    const element = document.getElementById('invoice-render');
-    const opt = {
-        margin: 10,
-        filename: `Invoice_${selectedCountry}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    html2pdf().set(opt).from(element).save();
-};
-
-// Экспорт Excel
-document.getElementById('export-excel-btn').onclick = () => {
-    const client = document.getElementById('f-client').value;
-    const amount = document.getElementById('f-amount').value;
-    
-    const ws_data = [
-        ["СЧЕТ НА ОПЛАТУ", "", ""],
-        ["Дата", new Date().toLocaleDateString(), ""],
-        ["Клиент", client, ""],
-        ["Сумма", amount, countrySettings[selectedCountry].currency],
-        ["Описание", document.getElementById('f-desc').value, ""]
+async function downloadExcel() {
+    await saveToDB();
+    const data = [
+        [docType, "Дата", new Date().toLocaleDateString()],
+        ["Поставщик", document.getElementById('p-name').value],
+        ["Клиент", document.getElementById('c-name').value],
+        ["Предмет", document.getElementById('val-desc').value],
+        ["Сумма", document.getElementById('val-amount').value, config[selectedCountry].cur]
     ];
-    
-    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Invoice");
-    XLSX.writeFile(wb, `DocMaker_Export.xlsx`);
-};
-
-// Сохранение в Supabase
-document.getElementById('save-db-btn').onclick = async () => {
-    const btn = document.getElementById('save-db-btn');
-    btn.innerText = "Сохранение...";
-    
-    const { error } = await db.from('invoices').insert([{
-        user_id: currentUser.id,
-        country: selectedCountry,
-        client_name: document.getElementById('f-client').value,
-        tax_id: document.getElementById('f-taxid').value,
-        amount: parseFloat(document.getElementById('f-amount').value),
-        document_type: 'Счет'
-    }]);
-
-    btn.innerText = "В историю";
-    if (error) alert("Ошибка БД: " + error.message);
-    else alert("Документ успешно сохранен в базе!");
-};
+    XLSX.utils.book_append_sheet(wb, ws, "Doc");
+    XLSX.writeFile(wb, `${docType}.xlsx`);
+}
