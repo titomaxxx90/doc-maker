@@ -10,20 +10,7 @@ const config = {
     'КР': { name: 'Кыргызстан', tax: 'ИНН', cur: 'KGS', flag: '🇰🇬', subunits: 'тыйын', curText: 'сомов' }
 };
 
-// --- ВОССТАНОВЛЕНИЕ СЕССИИ ПРИ ОБНОВЛЕНИИ СТРАНИЦЫ ---
-window.addEventListener('DOMContentLoaded', async () => {
-    const { data: { session } } = await db.auth.getSession();
-    if (session) {
-        currentUser = session.user;
-        isGuest = false;
-        document.getElementById('user-display').innerText = currentUser.email;
-        document.getElementById('user-display').classList.remove('hidden');
-        document.getElementById('auto-save-hint').classList.remove('hidden');
-        startApp();
-    }
-});
-
-// --- СУММА ПРОПИСЬЮ ---
+// --- СУММА ПРОПИСЬЮ (Улучшенная для больших чисел) ---
 function numberToWords(amount, country) {
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
@@ -79,49 +66,21 @@ function numberToWords(amount, country) {
 // --- АВТОРИЗАЦИЯ И СТАРТ ---
 document.getElementById('guest-btn').onclick = () => { isGuest = true; startApp(); };
 document.getElementById('login-btn').onclick = () => handleAuth('login');
-
-// Всплывающее окно регистрации
-document.getElementById('reg-btn').onclick = () => document.getElementById('reg-modal').classList.remove('hidden');
-window.closeRegModal = () => document.getElementById('reg-modal').classList.add('hidden');
-document.getElementById('submit-reg-btn').onclick = () => handleAuth('signup');
-
-document.getElementById('logout-btn').onclick = async () => {
-    await db.auth.signOut();
-    location.reload();
-};
+document.getElementById('reg-btn').onclick = () => handleAuth('signup');
+document.getElementById('logout-btn').onclick = () => location.reload();
 
 async function handleAuth(type) {
-    let email, password;
-    if (type === 'login') {
-        email = document.getElementById('email-input').value;
-        password = document.getElementById('password-input').value;
-    } else {
-        email = document.getElementById('reg-email').value;
-        password = document.getElementById('reg-password').value;
-    }
-
+    const email = document.getElementById('email-input').value;
+    const password = document.getElementById('password-input').value;
     if(!email || password.length < 6) return alert("Введите email и пароль от 6 символов");
 
     const { data, error } = (type === 'login') 
         ? await db.auth.signInWithPassword({ email, password })
         : await db.auth.signUp({ email, password });
 
-    if (error) {
-        alert(error.message);
-    } else if (type === 'signup') {
-        alert("Регистрация успешна! Теперь вы можете войти.");
-        closeRegModal();
-    } else { 
-        currentUser = data.user; 
-        isGuest = false; 
-        
-        // Показываем email и подсказку
-        document.getElementById('user-display').innerText = currentUser.email;
-        document.getElementById('user-display').classList.remove('hidden');
-        document.getElementById('auto-save-hint').classList.remove('hidden');
-        
-        startApp(); 
-    }
+    if (error) alert(error.message);
+    else if (type === 'signup') alert("Регистрация успешна!");
+    else { currentUser = data.user; isGuest = false; startApp(); }
 }
 
 function startApp() {
@@ -157,7 +116,19 @@ window.setDocType = (type) => {
 };
 
 function renderForm() {
-    let staffHtml = `<input type="text" id="p-ceo" placeholder="ФИО Исполнителя / Руководителя" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">`;
+    let staffHtml = '';
+    if (docType === 'Счет') {
+        staffHtml = `<input type="text" id="p-ceo" placeholder="ФИО Исполнителя / Руководителя" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">`;
+    } else {
+        // Добавлены поля специально для Формы Р-1
+        staffHtml = `
+            <input type="text" id="p-ceo-role" placeholder="Должность Исполнителя (напр. Директор)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
+            <input type="text" id="p-ceo" placeholder="ФИО Исполнителя" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
+            <hr class="my-2">
+            <input type="text" id="c-ceo-role" placeholder="Должность Заказчика (напр. Директор)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
+            <input type="text" id="c-ceo" placeholder="ФИО Заказчика" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">
+        `;
+    }
     document.getElementById('staff-fields').innerHTML = staffHtml;
 }
 
@@ -295,19 +266,187 @@ function updatePreview() {
             </div>
         `;
     } else {
+        // Точная копия формы Р-1 (АВР)
+        let totalItemsQty = docItems.reduce((acc, it) => acc + it.qty, 0);
+
         html = `
-            <div style="font-family: Arial, sans-serif; font-size: 11pt;">
-                <h2 style="text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 20px;">АКТ ВЫПОЛНЕННЫХ РАБОТ №${dNum} от ${dDate}</h2>
-                <p><strong>Исполнитель:</strong> ${val('p-name')}</p>
-                <p><strong>Заказчик:</strong> ${val('c-name')}</p>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px;">
-                    <thead><tr><th style="border: 1px solid black;">№</th><th style="border: 1px solid black;">Наименование</th><th style="border: 1px solid black;">Сумма</th></tr></thead>
+            <div style="font-family: Arial, sans-serif; font-size: 8pt; color: #000; line-height: 1.2;">
+                <div style="text-align: right; margin-bottom: 10px;">
+                    Приложение 50<br>к приказу Министра финансов<br>Республики Казахстан<br>от 20 декабря 2012 года № 562<br><br>
+                    <div style="font-weight: normal; margin-top: 5px;">Форма Р-1</div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 15px;">
+                    <tr>
+                        <td style="width: 70%; vertical-align: bottom;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="width: 15%; padding-bottom: 5px;">Заказчик</td>
+                                    <td style="border-bottom: 1px solid black; text-align: center; font-weight: bold;">
+                                        ${val('c-name')}${val('c-address') ? ', ' + val('c-address') : ''}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td></td>
+                                    <td style="text-align: center; font-size: 6pt;">полное наименование, адрес, данные о средствах связи</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-bottom: 5px; padding-top: 10px;">Исполнитель</td>
+                                    <td style="border-bottom: 1px solid black; text-align: center; font-weight: bold; padding-top: 10px;">
+                                        ${val('p-name')}${val('p-address') ? ', ' + val('p-address') : ''}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td></td>
+                                    <td style="text-align: center; font-size: 6pt;">полное наименование, адрес, данные о средствах связи</td>
+                                </tr>
+                            </table>
+                        </td>
+                        <td style="width: 30%; vertical-align: top; padding-left: 20px;">
+                            <div style="text-align: center; margin-bottom: 2px;">ИИН/БИН</div>
+                            <div style="border: 1px solid black; text-align: center; padding: 5px; margin-bottom: 15px;">${val('c-tax')}</div>
+                            <div style="border: 1px solid black; text-align: center; padding: 5px;">${val('p-tax')}</div>
+                        </td>
+                    </tr>
+                </table>
+
+                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 5px;">
+                    <tr>
+                        <td style="width: 15%;">Договор (контракт)</td>
+                        <td style="border-bottom: 1px solid black; width: 45%;">${val('c-contract') || 'Без договора'}</td>
+                        <td style="width: 40%; text-align: right;">
+                            <table style="border-collapse: collapse; float: right; text-align: center;">
+                                <tr>
+                                    <td style="border: 1px solid black; padding: 2px 10px;">Номер<br>документа</td>
+                                    <td style="border: 1px solid black; padding: 2px 10px;">Дата<br>составления</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: 1px solid black; padding: 2px 10px; font-weight: bold;">${dNum}</td>
+                                    <td style="border: 1px solid black; padding: 2px 10px; font-weight: bold;">${dDate}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+
+                <div style="text-align: center; font-weight: bold; font-size: 10pt; margin-bottom: 10px; padding-right: 180px;">
+                    АКТ ВЫПОЛНЕННЫХ РАБОТ (ОКАЗАННЫХ УСЛУГ)
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; text-align: center; border: 1px solid black; margin-bottom: 15px;">
+                    <thead>
+                        <tr>
+                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Номер<br>по<br>порядку</td>
+                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Наименование работ (услуг) (в разрезе их<br>подвидов в соответствии с технической<br>спецификацией, заданием, графиком выполнения<br>работ (услуг) при их наличии)</td>
+                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Дата выполнения<br>работ (оказания<br>услуг)</td>
+                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Сведения об отчете о научных<br>исследованиях, маркетинговых,<br>консультационных и прочих услугах<br>(дата, номер, количество страниц)<br>(при их наличии)</td>
+                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Единица<br>измерения</td>
+                            <td style="border: 1px solid black; padding: 4px;" colspan="3">Выполнено работ (оказано услуг)</td>
+                        </tr>
+                        <tr>
+                            <td style="border: 1px solid black; padding: 4px;">количество</td>
+                            <td style="border: 1px solid black; padding: 4px;">цена за единицу</td>
+                            <td style="border: 1px solid black; padding: 4px;">стоимость</td>
+                        </tr>
+                        <tr>
+                            <td style="border: 1px solid black; padding: 2px;">1</td>
+                            <td style="border: 1px solid black; padding: 2px;">2</td>
+                            <td style="border: 1px solid black; padding: 2px;">3</td>
+                            <td style="border: 1px solid black; padding: 2px;">4</td>
+                            <td style="border: 1px solid black; padding: 2px;">5</td>
+                            <td style="border: 1px solid black; padding: 2px;">6</td>
+                            <td style="border: 1px solid black; padding: 2px;">7</td>
+                            <td style="border: 1px solid black; padding: 2px;">8</td>
+                        </tr>
+                    </thead>
                     <tbody>
-                        ${docItems.map((it, i) => `<tr><td style="border: 1px solid black; text-align:center;">${i+1}</td><td style="border: 1px solid black;">${it.name}</td><td style="border: 1px solid black; text-align:right;">${(it.qty * it.price).toFixed(2)}</td></tr>`).join('')}
+                        ${docItems.map((it, i) => `
+                            <tr>
+                                <td style="border: 1px solid black; padding: 4px;">${i+1}</td>
+                                <td style="border: 1px solid black; padding: 4px; text-align: left;">${it.name}</td>
+                                <td style="border: 1px solid black; padding: 4px;">${dDate}</td>
+                                <td style="border: 1px solid black; padding: 4px;"></td>
+                                <td style="border: 1px solid black; padding: 4px;">${it.unit}</td>
+                                <td style="border: 1px solid black; padding: 4px;">${it.qty}</td>
+                                <td style="border: 1px solid black; padding: 4px; text-align: right;">${it.price.toFixed(2)}</td>
+                                <td style="border: 1px solid black; padding: 4px; text-align: right;">${(it.qty * it.price).toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                        <tr>
+                            <td colspan="5" style="text-align: right; padding: 4px; border: none;">Итого</td>
+                            <td style="border: 1px solid black; padding: 4px;">${totalItemsQty}</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: center;">x</td>
+                            <td style="border: 1px solid black; padding: 4px; text-align: right;">${totalAmount.toFixed(2)}</td>
+                        </tr>
                     </tbody>
                 </table>
-                <p><strong>Всего к оплате: ${numberToWords(totalAmount, selectedCountry)}</strong></p>
-                <p style="margin-top:40px;">Подписи сторон: ______________ / ______________</p>
+
+                <div style="font-size: 8pt; margin-bottom: 15px;">
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+                        <tr>
+                            <td style="width: 320px;">Сведения об использовании запасов, полученных от заказчика</td>
+                            <td style="border-bottom: 1px solid black;"></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td style="text-align: center; font-size: 6pt;">наименование, количество, стоимость</td>
+                        </tr>
+                    </table>
+                    
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 630px;">Приложение: Перечень документации, в том числе отчет(ы) о маркетинговых, научных исследованиях, консультационных и прочих услугах (обязательны при его<br>(их) наличии) на <span style="display:inline-block; width: 50px; border-bottom: 1px solid black;"></span> страниц</td>
+                            <td style="border-bottom: 1px solid black; vertical-align: bottom;"></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-top: 30px;">
+                    <tr>
+                        <td style="width: 15%;">Сдал (Исполнитель)</td>
+                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('p-ceo-role') || ''}</td>
+                        <td style="width: 2%; text-align: center;">/</td>
+                        <td style="width: 15%; border-bottom: 1px solid black;"></td>
+                        <td style="width: 2%; text-align: center;">/</td>
+                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('p-ceo') || ''}</td>
+                        <td style="width: 5%;"></td>
+                        
+                        <td style="width: 12%;">Принял (Заказчик)</td>
+                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('c-ceo-role') || ''}</td>
+                        <td style="width: 2%; text-align: center;">/</td>
+                        <td style="width: 15%; border-bottom: 1px solid black;"></td>
+                        <td style="width: 2%; text-align: center;">/</td>
+                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('c-ceo') || ''}</td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">должность</td>
+                        <td></td>
+                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">подпись</td>
+                        <td></td>
+                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">расшифровка подписи</td>
+                        <td></td>
+                        <td></td>
+                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">должность</td>
+                        <td></td>
+                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">подпись</td>
+                        <td></td>
+                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">расшифровка подписи</td>
+                    </tr>
+                </table>
+                
+                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-top: 15px;">
+                    <tr>
+                        <td style="width: 50%;"><strong>М.П.</strong></td>
+                        <td style="width: 25%; text-align: right; padding-right: 10px;">Дата подписания (принятия) работ (услуг)</td>
+                        <td style="width: 25%; border-bottom: 1px solid black; text-align: center;">${dDate}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding-top: 15px;"><strong>М.П.</strong></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </table>
             </div>
         `;
     }
@@ -345,6 +484,7 @@ window.restoreFromHistory = (i) => {
     selectedCountry = i.country;
     docType = i.document_type;
     
+    // Восстанавливаем массив товаров
     if (i.items && Array.isArray(i.items)) {
         docItems = i.items;
     } else {
@@ -367,14 +507,14 @@ window.restoreFromHistory = (i) => {
     setVal('c-name', i.client_name); setVal('c-tax', i.client_tax_id);
     setVal('c-address', i.c_address); setVal('c-contract', i.c_contract);
     
+    // Очищаем локальные поля ролей, т.к. они не сохраняются в основную схему БД, чтобы не вызывать ошибку
+    setVal('p-ceo-role', ''); setVal('c-ceo-role', ''); setVal('c-ceo', '');
+
     updatePreview();
 };
 
 async function downloadPDF() {
-    // Ждем окончания автосохранения перед конвертацией, если юзер авторизован
-    if(!isGuest && currentUser) {
-        await saveToDB();
-    }
+    if(!isGuest) await saveToDB();
     const element = document.getElementById('doc-render-area');
     html2pdf().from(element).set({ margin: [10, 5, 10, 5], filename: `Document.pdf`, html2canvas: { scale: 3 } }).save();
 }
@@ -408,6 +548,9 @@ async function saveToDB() {
         items: docItems
     };
     
-    await db.from('invoices').insert([payload]);
-    loadHistory(); // Обновляем историю сразу после сохранения
+    const { error } = await db.from('invoices').insert([payload]);
+    if (error) console.error("Ошибка сохранения в базу данных:", error);
+
+    // ФИКС БАГА: Принудительно переключаем историю на тип созданного документа, чтобы он сразу появился в списке!
+    switchHistoryTab(docType);
 }
