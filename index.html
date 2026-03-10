@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doc-Maker.site | Генератор Счетов и АВР онлайн</title>
-    <meta name="description" content="SEO-сервис для создания Счетов и АВР по стандартам СНГ. История документов и автозаполнение.">
+    <title>Doc-Maker.site | Генератор Счетов и АВР</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,28 +25,19 @@
     <main class="container mx-auto p-4 flex-grow">
         <section id="auth-section" class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl mt-6 overflow-hidden grid grid-cols-1 md:grid-cols-2">
             <div class="p-8 bg-slate-50 border-r">
-                <h2 class="text-2xl font-bold mb-6 text-slate-800">Преимущества SEO-сервиса</h2>
-                <ul class="space-y-4 text-sm text-gray-600">
-                    <li class="flex items-start gap-3">
-                        <span class="text-blue-500 font-bold">●</span>
-                        <div><strong>ГОСТ стандарты:</strong> Счета и АВР адаптированы под законодательство 4-х стран (РК, РФ, РБ, КР).</div>
-                    </li>
-                    <li class="flex items-start gap-3">
-                        <span class="text-blue-500 font-bold">●</span>
-                        <div><strong>SEO-оптимизация:</strong> Ваши документы всегда под рукой, структурированы и готовы к печати.</div>
-                    </li>
-                    <li class="flex items-start gap-3">
-                        <span class="text-blue-500 font-bold">●</span>
-                        <div><strong>Умные реквизиты:</strong> Введите данные один раз, и система запомнит их для будущих документов.</div>
-                    </li>
-                    <li class="flex items-start gap-3">
-                        <span class="text-blue-500 font-bold">●</span>
-                        <div><strong>Профессиональный PDF:</strong> Идеальное отображение на любом устройстве при отправке клиенту.</div>
-                    </li>
-                </ul>
+                <h2 class="text-2xl font-bold mb-6 text-slate-800">О сервисе Doc-Maker.site</h2>
+                <div class="space-y-4 text-sm text-gray-600 leading-relaxed">
+                    <p><strong>Doc-Maker.site</strong> — это простой инструмент для предпринимателей и бухгалтеров, которым нужно быстро выставить счет или подготовить акт выполненных работ.</p>
+                    <ul class="space-y-2">
+                        <li>• <strong>Стандарты СНГ:</strong> Формы документов адаптированы под требования Казахстана, России, Беларуси и Кыргызстана.</li>
+                        <li>• <strong>Облачный архив:</strong> При регистрации ваши документы сохраняются в истории — их можно открыть и скачать в любой момент с любого устройства.</li>
+                        <li>• <strong>Удобство:</strong> Вы один раз вводите данные своей компании, и они будут доступны для выбора во всех будущих документах.</li>
+                        <li>• <strong>Мгновенный PDF:</strong> Готовый документ выглядит профессионально и готов к отправке клиенту сразу после заполнения.</li>
+                    </ul>
+                </div>
             </div>
             <div class="p-8 space-y-4 flex flex-col justify-center">
-                <h2 class="text-xl font-bold text-center mb-2">Вход / Регистрация</h2>
+                <h2 class="text-xl font-bold text-center mb-2">Вход в кабинет</h2>
                 <input type="email" id="email-input" placeholder="Email" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
                 <input type="password" id="password-input" placeholder="Пароль" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
                 <div class="grid grid-cols-2 gap-2">
@@ -81,22 +71,22 @@
                     <input type="text" id="p-name" placeholder="Название компании" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
                     <input type="text" id="p-tax" placeholder="БИН / ИНН" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
                     <input type="text" id="p-bank" placeholder="Банк и реквизиты" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
-                    <div id="staff-fields" class="space-y-2">
-                        </div>
+                    <div id="staff-fields" class="space-y-2"></div>
                 </div>
 
                 <div id="dynamic-form" class="bg-white p-4 rounded-xl shadow border space-y-2"></div>
 
-                <div id="history-box" class="bg-white p-4 rounded-xl shadow border hidden">
-                    <h3 class="font-bold text-gray-700 text-xs mb-2">Последние документы</h3>
-                    <div id="history-list" class="space-y-1 text-[10px] text-gray-500 italic"></div>
+                <div id="history-box" class="bg-white rounded-xl shadow border hidden overflow-hidden">
+                    <div class="flex bg-gray-50 border-b">
+                        <button onclick="switchHistoryTab('Счет')" id="tab-h-inv" class="flex-1 py-2 text-[10px] font-bold border-r bg-white">СЧЕТА</button>
+                        <button onclick="switchHistoryTab('АВР')" id="tab-h-avr" class="flex-1 py-2 text-[10px] font-bold text-gray-400">АКТЫ</button>
+                    </div>
+                    <div id="history-list" class="p-2 space-y-1 max-h-48 overflow-y-auto"></div>
                 </div>
             </div>
 
             <div class="lg:col-span-8 space-y-4">
-                <div class="no-print">
-                    <button onclick="downloadPDF()" class="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow-lg">СКАЧАТЬ В PDF</button>
-                </div>
+                <button onclick="downloadPDF()" class="no-print w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition">СКАЧАТЬ PDF</button>
                 <div id="doc-render-area" class="bg-white p-12 shadow-2xl min-h-[1000px] border border-gray-300 doc-paper overflow-x-auto"></div>
             </div>
         </section>
