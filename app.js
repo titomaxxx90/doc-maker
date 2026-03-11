@@ -5,7 +5,7 @@ const config = {
     'РК': { 
         name: 'Казахстан', 
         tax: 'БИН/ИИН', 
-        taxLabel: 'ИИН/БИН',  // для отображения в предпросмотре
+        taxLabel: 'ИИН/БИН',
         cur: 'KZT', 
         flag: '🇰🇿', 
         subunits: 'тиын', 
@@ -136,6 +136,7 @@ function startApp() {
     }
 
     renderCountryBtns();
+    updateTaxPlaceholders(); // <-- добавили обновление плейсхолдеров при старте
     renderForm();
     renderItemsInputs();
     updatePreview();
@@ -151,7 +152,25 @@ function renderCountryBtns() {
     `).join('');
 }
 
-window.setCountry = (c) => { selectedCountry = c; renderCountryBtns(); updatePreview(); };
+window.setCountry = (c) => { 
+    selectedCountry = c; 
+    renderCountryBtns(); 
+    updateTaxPlaceholders(); // <-- обновляем плейсхолдеры при смене страны
+    updatePreview(); 
+};
+
+// Функция для обновления плейсхолдеров полей ИНН/БИН
+function updateTaxPlaceholders() {
+    const taxType = config[selectedCountry].tax;
+    const pTaxInput = document.getElementById('p-tax');
+    const cTaxInput = document.getElementById('c-tax');
+    if (pTaxInput) {
+        pTaxInput.placeholder = `Ваш ${taxType}`;
+    }
+    if (cTaxInput) {
+        cTaxInput.placeholder = `${taxType} клиента`;
+    }
+}
 
 window.setDocType = (type) => {
     docType = type;
@@ -386,7 +405,6 @@ function updatePreview() {
             </div>
         ` : '';
 
-        // Используем taxLabel из config для отображения в предпросмотре
         const taxLabel = config[selectedCountry].taxLabel;
 
         html = `
@@ -598,7 +616,7 @@ async function loadHistory() {
             const dateStr = i.doc_date ? new Date(i.doc_date).toLocaleDateString('ru-RU') : 'дата не указана';
             return `
                 <div onclick='restoreFromHistory(${JSON.stringify(i)})' class="relative p-2 border rounded bg-gray-50 hover:bg-blue-50 cursor-pointer transition group">
-                    <div class="flex justify-between font-bold text-[9px] text-blue-600 pr-6"> <!-- добавлен отступ справа -->
+                    <div class="flex justify-between font-bold text-[9px] text-blue-600 pr-6">
                         <span>№${i.doc_number || 'б/н'}</span>
                         <span>от ${dateStr}</span>
                     </div>
@@ -641,6 +659,7 @@ window.restoreFromHistory = (i) => {
     }
 
     renderCountryBtns();
+    updateTaxPlaceholders(); // обновляем плейсхолдеры при восстановлении из истории
     renderForm();
     renderItemsInputs();
     
