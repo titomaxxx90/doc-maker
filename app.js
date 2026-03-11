@@ -76,12 +76,10 @@ async function handleLogout() {
     await db.auth.signOut();
     currentUser = null;
     isGuest = false;
-    // Возвращаем экран авторизации
     document.getElementById('auth-section').classList.remove('hidden');
     document.getElementById('app-section').classList.add('hidden');
     document.getElementById('logout-btn').classList.add('hidden');
     document.getElementById('user-display').classList.add('hidden');
-    // Очищаем поля ввода
     document.getElementById('email-input').value = '';
     document.getElementById('password-input').value = '';
 }
@@ -96,7 +94,6 @@ function startApp() {
     if (!isGuest) {
         document.getElementById('history-box').classList.remove('hidden');
         document.getElementById('auto-save-hint').classList.remove('hidden');
-        // Показываем email пользователя
         const userDisplay = document.getElementById('user-display');
         userDisplay.classList.remove('hidden');
         userDisplay.innerText = currentUser.email;
@@ -128,6 +125,17 @@ window.setDocType = (type) => {
     docType = type;
     document.getElementById('btn-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase';
     document.getElementById('btn-avr').className = type === 'АВР' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase';
+    
+    // Показываем или скрываем банковские поля в зависимости от типа документа
+    const bankFields = document.getElementById('bank-fields');
+    if (bankFields) {
+        if (type === 'Счет') {
+            bankFields.classList.remove('hidden');
+        } else {
+            bankFields.classList.add('hidden');
+        }
+    }
+    
     renderForm();
     updatePreview();
 };
@@ -141,10 +149,10 @@ function renderForm() {
         `;
     } else {
         staffHtml = `
-            <input type="text" id="p-ceo-role" placeholder="Должность Исполнителя (напр. Директор)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
+            <input type="text" id="p-ceo-role" placeholder="Должность Исполнителя" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
             <input type="text" id="p-ceo" placeholder="ФИО Исполнителя" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
             <hr class="my-2">
-            <input type="text" id="c-ceo-role" placeholder="Должность Заказчика (напр. Директор)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
+            <input type="text" id="c-ceo-role" placeholder="Должность Заказчика" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
             <input type="text" id="c-ceo" placeholder="ФИО Заказчика" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">
         `;
     }
@@ -181,7 +189,7 @@ function renderItemsInputs() {
 
 // ---------- ПРЕДПРОСМОТР ----------
 function numberToWords(amount, country) {
-    // Функция без изменений (см. исходный код)
+    // Функция без изменений (оставлена как в исходнике)
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
     
@@ -355,7 +363,6 @@ function updatePreview() {
         html = `
             <div style="font-family: Arial, sans-serif; font-size: 8pt; color: #000; line-height: 1.2;">
                 ${headerKZ}
-                <!-- остальная часть формы АВР без изменений -->
                 <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 15px;">
                     <tr>
                         <td style="width: 70%; vertical-align: bottom;">
@@ -543,21 +550,35 @@ window.switchHistoryTab = (type) => {
 
 async function loadHistory() {
     if (!currentUser) return;
-    const { data } = await db.from('invoices').select('*').eq('user_id', currentUser.id).eq('document_type', activeHistoryTab).order('created_at', { ascending: false });
+    const { data, error } = await db
+        .from('invoices')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .eq('document_type', activeHistoryTab)
+        .order('created_at', { ascending: false });
+
     const cont = document.getElementById('history-list');
+    if (error) {
+        console.error(error);
+        cont.innerHTML = `<div class="text-center py-6 text-red-300 text-xs">Ошибка загрузки</div>`;
+        return;
+    }
+
     if (data && data.length > 0) {
-        cont.innerHTML = data.map(i => `
-            <div onclick='restoreFromHistory(${JSON.stringify(i)})' class="relative p-2 border rounded bg-gray-50 hover:bg-blue-50 cursor-pointer transition group">
-                <div class="flex justify-between font-bold text-[9px] text-blue-600">
-                    <span>№${i.doc_number || 'б/н'} от ${i.doc_date ? new Date(i.doc_date).toLocaleDateString() : ''}</span>
-                    <span>${i.amount ? i.amount.toFixed(2) : 0} ${config[i.country]?.cur || ''}</span>
+        cont.innerHTML = data.map(i => {
+            const dateStr = i.doc_date ? new Date(i.doc_date).toLocaleDateString('ru-RU') : 'дата не указана';
+            return `
+                <div onclick='restoreFromHistory(${JSON.stringify(i)})' class="relative p-2 border rounded bg-gray-50 hover:bg-blue-50 cursor-pointer transition group">
+                    <div class="flex justify-between font-bold text-[9px] text-blue-600">
+                        <span>№${i.doc_number || 'б/н'}</span>
+                        <span>от ${dateStr}</span>
+                    </div>
+                    <button onclick="event.stopPropagation(); deleteHistoryItem('${i.id}')" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition">✕</button>
                 </div>
-                <div class="text-[10px] truncate text-gray-600">${i.client_name || 'Без имени'}</div>
-                <button onclick="event.stopPropagation(); deleteHistoryItem('${i.id}')" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition">✕</button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } else {
-        cont.innerHTML = `<div class="text-center py-6 text-gray-300 text-xs">Нет данных</div>`;
+        cont.innerHTML = `<div class="text-center py-6 text-gray-300 text-xs">Нет документов</div>`;
     }
     updateHistoryCounts();
 }
@@ -613,36 +634,48 @@ window.restoreFromHistory = (i) => {
     setVal('c-address', i.c_address);
     setVal('c-contract', i.c_contract);
     
-    setVal('p-ceo-role', '');
-    setVal('c-ceo-role', '');
-    setVal('c-ceo', '');
+    // Для АВР дополнительные поля
+    setVal('p-ceo-role', i.p_ceo_role || '');
+    setVal('c-ceo-role', i.c_ceo_role || '');
+    setVal('c-ceo', i.c_ceo || '');
 
     updatePreview();
 };
 
 // ---------- СОХРАНЕНИЕ И PDF ----------
 async function downloadPDF() {
-    if (!isGuest) await saveToDB(); // всегда сохраняем для авторизованных
+    if (!isGuest) await saveToDB();
     const element = document.getElementById('doc-render-area');
     html2pdf().from(element).set({ margin: [10, 5, 10, 5], filename: `Document.pdf`, html2canvas: { scale: 3 } }).save();
 }
 
 async function saveToDB() {
     if (isGuest || !currentUser) return;
-    
+
     const totalAmount = docItems.reduce((acc, it) => acc + (it.qty * it.price), 0);
     const val = (id) => document.getElementById(id)?.value || '';
 
-    // Гарантируем, что номер документа и дата не пустые
+    // Генерация номера, если пусто
     let docNumber = val('doc-number').trim();
-    if (docNumber === '') docNumber = 'б/н';
-    
+    if (docNumber === '') {
+        const prefix = docType === 'Счет' ? 'СЧ' : 'АКТ';
+        const now = new Date();
+        const dateStr = now.toISOString().slice(2,10).replace(/-/g, ''); // YYMMDD
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        docNumber = `${prefix}-${dateStr}-${random}`;
+    }
+
+    // Дата, если не заполнена
     let docDate = val('doc-date');
     if (!docDate) {
-        // если дата не выбрана, ставим сегодня
         const today = new Date();
         docDate = today.toISOString().split('T')[0];
     }
+
+    // Создаём описание из первой позиции
+    const description = docItems.length > 0 && docItems[0].name 
+        ? docItems[0].name 
+        : 'Документ без названия';
 
     const payload = {
         user_id: currentUser.id,
@@ -650,6 +683,7 @@ async function saveToDB() {
         document_type: docType,
         doc_number: docNumber,
         doc_date: docDate,
+        description: description,
         provider_name: val('p-name'),
         provider_tax_id: val('p-tax'),
         p_address: val('p-address'),
@@ -665,13 +699,25 @@ async function saveToDB() {
         c_address: val('c-address'),
         c_contract: val('c-contract'),
         amount: totalAmount,
-        items: docItems
+        items: docItems,
+        // Поля для АВР
+        p_ceo_role: val('p-ceo-role'),
+        c_ceo_role: val('c-ceo-role'),
+        c_ceo: val('c-ceo')
     };
-    
-    const { error } = await db.from('invoices').insert([payload]);
-    if (error) console.error("Ошибка сохранения в базу данных:", error);
-    else {
-        // Принудительно обновляем историю после успешного сохранения
-        switchHistoryTab(docType);
+
+    try {
+        const { error } = await db.from('invoices').insert([payload]);
+        if (error) {
+            console.error("Ошибка сохранения в базу данных:", error);
+            alert("Ошибка при сохранении: " + error.message);
+        } else {
+            console.log("Документ сохранён");
+            // Принудительно обновляем историю после успешного сохранения
+            switchHistoryTab(docType);
+        }
+    } catch (err) {
+        console.error("Исключение при сохранении:", err);
+        alert("Ошибка соединения с базой данных");
     }
 }
