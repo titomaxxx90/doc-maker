@@ -40,6 +40,19 @@ const config = {
     }
 };
 
+// ---------- ФУНКЦИЯ ЭКРАНИРОВАНИЯ ----------
+function escapeHtml(text) {
+    if (text === undefined || text === null) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
 // ---------- ПРОВЕРКА СЕССИИ ПРИ ЗАГРУЗКЕ ----------
 (async function initAuth() {
     const { data: { session } } = await db.auth.getSession();
@@ -136,7 +149,7 @@ function startApp() {
     }
 
     renderCountryBtns();
-    updateTaxPlaceholders(); // <-- добавили обновление плейсхолдеров при старте
+    updateTaxPlaceholders();
     renderForm();
     renderItemsInputs();
     updatePreview();
@@ -147,7 +160,7 @@ function renderCountryBtns() {
     document.getElementById('country-btns').innerHTML = Object.keys(config).map(c => `
         <button onclick="setCountry('${c}')" class="p-2 rounded border flex items-center gap-2 transition ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50 hover:bg-gray-200'}">
             <span class="text-xl">${config[c].flag}</span>
-            <span class="text-[10px] font-bold uppercase truncate">${config[c].name}</span>
+            <span class="text-[10px] font-bold uppercase truncate">${escapeHtml(config[c].name)}</span>
         </button>
     `).join('');
 }
@@ -155,11 +168,10 @@ function renderCountryBtns() {
 window.setCountry = (c) => { 
     selectedCountry = c; 
     renderCountryBtns(); 
-    updateTaxPlaceholders(); // <-- обновляем плейсхолдеры при смене страны
+    updateTaxPlaceholders();
     updatePreview(); 
 };
 
-// Функция для обновления плейсхолдеров полей ИНН/БИН
 function updateTaxPlaceholders() {
     const taxType = config[selectedCountry].tax;
     const pTaxInput = document.getElementById('p-tax');
@@ -228,9 +240,9 @@ function renderItemsInputs() {
     const cont = document.getElementById('items-container');
     cont.innerHTML = docItems.map((item, i) => `
         <div class="flex gap-1 items-center bg-gray-50 p-2 rounded border">
-            <input type="text" value="${item.name}" oninput="updateItem(${i}, 'name', this.value)" placeholder="Название" class="flex-1 p-1 border rounded text-xs outline-none">
+            <input type="text" value="${escapeHtml(item.name)}" oninput="updateItem(${i}, 'name', this.value)" placeholder="Название" class="flex-1 p-1 border rounded text-xs outline-none">
             <input type="number" value="${item.qty}" oninput="updateItem(${i}, 'qty', this.value)" placeholder="Кол-во" class="w-12 p-1 border rounded text-xs outline-none text-center">
-            <input type="text" value="${item.unit}" oninput="updateItem(${i}, 'unit', this.value)" placeholder="Ед." class="w-10 p-1 border rounded text-xs outline-none text-center">
+            <input type="text" value="${escapeHtml(item.unit)}" oninput="updateItem(${i}, 'unit', this.value)" placeholder="Ед." class="w-10 p-1 border rounded text-xs outline-none text-center">
             <input type="number" value="${item.price}" oninput="updateItem(${i}, 'price', this.value)" placeholder="Цена" class="w-20 p-1 border rounded text-xs outline-none text-right">
             <button onclick="removeItem(${i})" class="text-red-500 px-2 text-xs font-bold hover:text-red-700">✕</button>
         </div>
@@ -291,9 +303,13 @@ function numberToWords(amount, country) {
 }
 
 function updatePreview() {
+    // Функция для получения экранированного значения поля
+    const valEsc = (id) => escapeHtml(document.getElementById(id)?.value || '');
+    // Для числовых значений (не требуют экранирования) можно использовать обычный val
     const val = (id) => document.getElementById(id)?.value || '';
-    const dNum = val('doc-number') || '___';
-    const dDateVal = val('doc-date');
+
+    const dNum = valEsc('doc-number') || '___';
+    const dDateVal = document.getElementById('doc-date')?.value;
     const dDate = dDateVal ? new Date(dDateVal).toLocaleDateString('ru-RU') : '___';
     
     let totalAmount = 0;
@@ -303,10 +319,10 @@ function updatePreview() {
         return `
             <tr>
                 <td style="border: 1px solid black; padding: 4px; text-align: center;">${index + 1}</td>
-                <td style="border: 1px solid black; padding: 4px; text-align: center;">${it.code || (index+1)}</td>
-                <td style="border: 1px solid black; padding: 4px;">${it.name || '&nbsp;'}</td>
+                <td style="border: 1px solid black; padding: 4px; text-align: center;">${escapeHtml(it.code || (index+1))}</td>
+                <td style="border: 1px solid black; padding: 4px;">${escapeHtml(it.name) || '&nbsp;'}</td>
                 <td style="border: 1px solid black; padding: 4px; text-align: center;">${it.qty}</td>
-                <td style="border: 1px solid black; padding: 4px; text-align: center;">${it.unit}</td>
+                <td style="border: 1px solid black; padding: 4px; text-align: center;">${escapeHtml(it.unit)}</td>
                 <td style="border: 1px solid black; padding: 4px; text-align: right;">${it.price.toFixed(2)}</td>
                 <td style="border: 1px solid black; padding: 4px; text-align: right;">${sum.toFixed(2)}</td>
             </tr>
@@ -333,32 +349,32 @@ function updatePreview() {
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; border: 1px solid black; text-align: center;">
                     <tr>
                         <td style="border: 1px solid black; text-align: left; padding: 6px; vertical-align: top;" rowspan="2" width="50%">
-                            Бенефициар:<br><strong>${val('p-name')}</strong><br><br>${config[selectedCountry].tax}: ${val('p-tax')}
+                            Бенефициар:<br><strong>${valEsc('p-name')}</strong><br><br>${escapeHtml(config[selectedCountry].tax)}: ${valEsc('p-tax')}
                         </td>
                         <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">ИИК</td>
                         <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">Кбе</td>
                     </tr>
                     <tr>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 6px;">${val('p-iik')}</td>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 6px;">${val('p-kbe')}</td>
+                        <td style="border: 1px solid black; font-weight: bold; padding: 6px;">${valEsc('p-iik')}</td>
+                        <td style="border: 1px solid black; font-weight: bold; padding: 6px;">${valEsc('p-kbe')}</td>
                     </tr>
                     <tr>
                         <td style="border: 1px solid black; text-align: left; padding: 6px;">
-                            Банк бенефициара:<br>${val('p-bank')}
+                            Банк бенефициара:<br>${valEsc('p-bank')}
                         </td>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">БИК<br><span style="font-weight:normal; display:block; margin-top:5px;">${val('p-bik')}</span></td>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">Код назначения платежа<br><span style="font-weight:normal; display:block; margin-top:5px;">${val('p-knp')}</span></td>
+                        <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">БИК<br><span style="font-weight:normal; display:block; margin-top:5px;">${valEsc('p-bik')}</span></td>
+                        <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">Код назначения платежа<br><span style="font-weight:normal; display:block; margin-top:5px;">${valEsc('p-knp')}</span></td>
                     </tr>
                 </table>
 
                 <h2 style="font-size: 16pt; font-weight: bold; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 15px;">
-                    Счет на оплату №${dNum} от ${dDate}
+                    Счет на оплату №${dNum} от ${escapeHtml(dDate)}
                 </h2>
 
                 <table style="width: 100%; margin-bottom: 15px;">
-                    <tr><td style="width: 100px; vertical-align: top;">Поставщик:</td><td style="font-weight: bold;">${val('p-name')}${val('p-address') ? ', ' + val('p-address') : ''}</td></tr>
-                    <tr><td style="vertical-align: top; padding-top: 15px;">Покупатель:</td><td style="font-weight: bold; padding-top: 15px;">ИИН/БИН: ${val('c-tax')}, ${val('c-name')}${val('c-address') ? ', ' + val('c-address') : ''}</td></tr>
-                    <tr><td style="vertical-align: top; padding-top: 15px;">Договор:</td><td style="padding-top: 15px;">${val('c-contract')}</td></tr>
+                    <tr><td style="width: 100px; vertical-align: top;">Поставщик:</td><td style="font-weight: bold;">${valEsc('p-name')}${valEsc('p-address') ? ', ' + valEsc('p-address') : ''}</td></tr>
+                    <tr><td style="vertical-align: top; padding-top: 15px;">Покупатель:</td><td style="font-weight: bold; padding-top: 15px;">ИИН/БИН: ${valEsc('c-tax')}, ${valEsc('c-name')}${valEsc('c-address') ? ', ' + valEsc('c-address') : ''}</td></tr>
+                    <tr><td style="vertical-align: top; padding-top: 15px;">Договор:</td><td style="padding-top: 15px;">${valEsc('c-contract')}</td></tr>
                 </table>
 
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
@@ -385,14 +401,14 @@ function updatePreview() {
 
                 <div style="margin-bottom: 10px;">
                     Всего наименований ${docItems.length}, на сумму ${totalAmount.toFixed(2)} ${config[selectedCountry].cur.toUpperCase()}<br>
-                    <strong>Всего к оплате: ${numberToWords(totalAmount, selectedCountry)}</strong>
+                    <strong>Всего к оплате: ${escapeHtml(numberToWords(totalAmount, selectedCountry))}</strong>
                 </div>
                 
                 <div style="border-bottom: 3px solid black; margin-bottom: 20px;"></div>
 
                 <div>
-                    Директор <span style="display:inline-block; width: 300px; border-bottom: 1px solid black; margin-left: 15px;">${val('p-ceo')}</span> //<br>
-                    Бухгалтер <span style="display:inline-block; width: 300px; border-bottom: 1px solid black; margin-left: 15px;">${val('p-accountant')}</span> //
+                    Директор <span style="display:inline-block; width: 300px; border-bottom: 1px solid black; margin-left: 15px;">${valEsc('p-ceo')}</span> //<br>
+                    Бухгалтер <span style="display:inline-block; width: 300px; border-bottom: 1px solid black; margin-left: 15px;">${valEsc('p-accountant')}</span> //
                 </div>
             </div>
         `;
@@ -405,7 +421,7 @@ function updatePreview() {
             </div>
         ` : '';
 
-        const taxLabel = config[selectedCountry].taxLabel;
+        const taxLabel = escapeHtml(config[selectedCountry].taxLabel);
 
         html = `
             <div style="font-family: Arial, sans-serif; font-size: 8pt; color: #000; line-height: 1.2;">
@@ -417,7 +433,7 @@ function updatePreview() {
                                 <tr>
                                     <td style="width: 15%; padding-bottom: 5px;">Заказчик</td>
                                     <td style="border-bottom: 1px solid black; text-align: center; font-weight: bold;">
-                                        ${val('c-name')}${val('c-address') ? ', ' + val('c-address') : ''}
+                                        ${valEsc('c-name')}${valEsc('c-address') ? ', ' + valEsc('c-address') : ''}
                                     </td>
                                 </tr>
                                 <tr>
@@ -427,7 +443,7 @@ function updatePreview() {
                                 <tr>
                                     <td style="padding-bottom: 5px; padding-top: 10px;">Исполнитель</td>
                                     <td style="border-bottom: 1px solid black; text-align: center; font-weight: bold; padding-top: 10px;">
-                                        ${val('p-name')}${val('p-address') ? ', ' + val('p-address') : ''}
+                                        ${valEsc('p-name')}${valEsc('p-address') ? ', ' + valEsc('p-address') : ''}
                                     </td>
                                 </tr>
                                 <tr>
@@ -438,8 +454,8 @@ function updatePreview() {
                         </td>
                         <td style="width: 30%; vertical-align: top; padding-left: 20px;">
                             <div style="text-align: center; margin-bottom: 2px;">${taxLabel}</div>
-                            <div style="border: 1px solid black; text-align: center; padding: 5px; margin-bottom: 15px;">${val('c-tax')}</div>
-                            <div style="border: 1px solid black; text-align: center; padding: 5px;">${val('p-tax')}</div>
+                            <div style="border: 1px solid black; text-align: center; padding: 5px; margin-bottom: 15px;">${valEsc('c-tax')}</div>
+                            <div style="border: 1px solid black; text-align: center; padding: 5px;">${valEsc('p-tax')}</div>
                         </td>
                     </tr>
                 </table>
@@ -447,7 +463,7 @@ function updatePreview() {
                 <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 5px;">
                     <tr>
                         <td style="width: 15%;">Договор (контракт)</td>
-                        <td style="border-bottom: 1px solid black; width: 45%;">${val('c-contract') || 'Без договора'}</td>
+                        <td style="border-bottom: 1px solid black; width: 45%;">${valEsc('c-contract') || 'Без договора'}</td>
                         <td style="width: 40%; text-align: right;">
                             <table style="border-collapse: collapse; float: right; text-align: center;">
                                 <tr>
@@ -456,7 +472,7 @@ function updatePreview() {
                                 </tr>
                                 <tr>
                                     <td style="border: 1px solid black; padding: 2px 10px; font-weight: bold;">${dNum}</td>
-                                    <td style="border: 1px solid black; padding: 2px 10px; font-weight: bold;">${dDate}</td>
+                                    <td style="border: 1px solid black; padding: 2px 10px; font-weight: bold;">${escapeHtml(dDate)}</td>
                                 </tr>
                             </table>
                         </td>
@@ -497,10 +513,10 @@ function updatePreview() {
                         ${docItems.map((it, i) => `
                             <tr>
                                 <td style="border: 1px solid black; padding: 4px;">${i+1}</td>
-                                <td style="border: 1px solid black; padding: 4px; text-align: left;">${it.name}</td>
-                                <td style="border: 1px solid black; padding: 4px;">${dDate}</td>
+                                <td style="border: 1px solid black; padding: 4px; text-align: left;">${escapeHtml(it.name)}</td>
+                                <td style="border: 1px solid black; padding: 4px;">${escapeHtml(dDate)}</td>
                                 <td style="border: 1px solid black; padding: 4px;"></td>
-                                <td style="border: 1px solid black; padding: 4px;">${it.unit}</td>
+                                <td style="border: 1px solid black; padding: 4px;">${escapeHtml(it.unit)}</td>
                                 <td style="border: 1px solid black; padding: 4px;">${it.qty}</td>
                                 <td style="border: 1px solid black; padding: 4px; text-align: right;">${it.price.toFixed(2)}</td>
                                 <td style="border: 1px solid black; padding: 4px; text-align: right;">${(it.qty * it.price).toFixed(2)}</td>
@@ -538,19 +554,19 @@ function updatePreview() {
                 <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-top: 30px;">
                     <tr>
                         <td style="width: 15%;">Сдал (Исполнитель)</td>
-                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('p-ceo-role') || ''}</td>
+                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${valEsc('p-ceo-role') || ''}</td>
                         <td style="width: 2%; text-align: center;">/</td>
                         <td style="width: 15%; border-bottom: 1px solid black;"></td>
                         <td style="width: 2%; text-align: center;">/</td>
-                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('p-ceo') || ''}</td>
+                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${valEsc('p-ceo') || ''}</td>
                         <td style="width: 5%;"></td>
                         
                         <td style="width: 12%;">Принял (Заказчик)</td>
-                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('c-ceo-role') || ''}</td>
+                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${valEsc('c-ceo-role') || ''}</td>
                         <td style="width: 2%; text-align: center;">/</td>
                         <td style="width: 15%; border-bottom: 1px solid black;"></td>
                         <td style="width: 2%; text-align: center;">/</td>
-                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('c-ceo') || ''}</td>
+                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${valEsc('c-ceo') || ''}</td>
                     </tr>
                     <tr>
                         <td></td>
@@ -573,7 +589,7 @@ function updatePreview() {
                     <tr>
                         <td style="width: 50%;"><strong>М.П.</strong></td>
                         <td style="width: 25%; text-align: right; padding-right: 10px;">Дата подписания (принятия) работ (услуг)</td>
-                        <td style="width: 25%; border-bottom: 1px solid black; text-align: center;">${dDate}</td>
+                        <td style="width: 25%; border-bottom: 1px solid black; text-align: center;">${escapeHtml(dDate)}</td>
                     </tr>
                     <tr>
                         <td style="padding-top: 15px;"><strong>М.П.</strong></td>
@@ -615,10 +631,10 @@ async function loadHistory() {
         cont.innerHTML = data.map(i => {
             const dateStr = i.doc_date ? new Date(i.doc_date).toLocaleDateString('ru-RU') : 'дата не указана';
             return `
-                <div onclick='restoreFromHistory(${JSON.stringify(i)})' class="relative p-2 border rounded bg-gray-50 hover:bg-blue-50 cursor-pointer transition group">
+                <div onclick='restoreFromHistory(${JSON.stringify(i).replace(/'/g, "&#39;")})' class="relative p-2 border rounded bg-gray-50 hover:bg-blue-50 cursor-pointer transition group">
                     <div class="flex justify-between font-bold text-[9px] text-blue-600 pr-6">
-                        <span>№${i.doc_number || 'б/н'}</span>
-                        <span>от ${dateStr}</span>
+                        <span>№${escapeHtml(i.doc_number) || 'б/н'}</span>
+                        <span>от ${escapeHtml(dateStr)}</span>
                     </div>
                     <button onclick="event.stopPropagation(); deleteHistoryItem('${i.id}')" class="absolute right-1 top-1/2 transform -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition">✕</button>
                 </div>
@@ -659,7 +675,7 @@ window.restoreFromHistory = (i) => {
     }
 
     renderCountryBtns();
-    updateTaxPlaceholders(); // обновляем плейсхолдеры при восстановлении из истории
+    updateTaxPlaceholders();
     renderForm();
     renderItemsInputs();
     
