@@ -1,9 +1,5 @@
 let currentUser = null, selectedCountry = 'РК', docType = 'Счет', isGuest = false, activeHistoryTab = 'Счет';
-
-// Глобальный массив для безопасного хранения истории без поломки HTML
 window.currentHistoryData = [];
-
-// Массив для хранения позиций
 let docItems = [{ code: '1', name: '', qty: 1, unit: 'шт', price: 0 }];
 
 const config = {
@@ -13,12 +9,10 @@ const config = {
     'КР': { name: 'Кыргызстан', tax: 'ИНН', cur: 'KGS', flag: '🇰🇬', subunits: 'тыйын', curText: 'сомов' }
 };
 
-// 7. Проверка сессии при загрузке страницы
 window.addEventListener('DOMContentLoaded', async () => {
     const { data: { session } } = await db.auth.getSession();
     if (session) {
         currentUser = session.user;
-        isGuest = false;
         document.getElementById('user-display').innerText = currentUser.email;
         document.getElementById('user-display').classList.remove('hidden');
         document.getElementById('auto-save-hint').classList.remove('hidden');
@@ -26,11 +20,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// --- СУММА ПРОПИСЬЮ ---
 function numberToWords(amount, country) {
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
-    
     const ones = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
     const onesFem = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
     const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
@@ -38,60 +30,38 @@ function numberToWords(amount, country) {
     const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
 
     function getForm(n, forms) {
-        n = Math.abs(n) % 100;
-        let n1 = n % 10;
+        n = Math.abs(n) % 100; let n1 = n % 10;
         if (n > 10 && n < 20) return forms[2];
         if (n1 > 1 && n1 < 5) return forms[1];
         if (n1 === 1) return forms[0];
         return forms[2];
     }
-
     function parseGroup(n, isFemale, forms) {
-        let r = '';
-        let h = Math.floor(n / 100);
-        let t = Math.floor((n % 100) / 10);
-        let u = n % 10;
+        let r = ''; let h = Math.floor(n / 100); let t = Math.floor((n % 100) / 10); let u = n % 10;
         if (h > 0) r += hundreds[h] + ' ';
         if (t === 1) r += teens[u] + ' ';
-        else {
-            if (t > 1) r += tens[t] + ' ';
-            if (u > 0) r += (isFemale ? onesFem[u] : ones[u]) + ' ';
-        }
+        else { if (t > 1) r += tens[t] + ' '; if (u > 0) r += (isFemale ? onesFem[u] : ones[u]) + ' '; }
         if (n > 0 && forms) r += getForm(n, forms) + ' ';
         return r;
     }
-
     if (val === 0) return `Ноль ${config[country].curText} 00 ${config[country].subunits}`;
-
-    let m = Math.floor(val / 1000000);
-    let th = Math.floor((val % 1000000) / 1000);
-    let rem = val % 1000;
-
+    let m = Math.floor(val / 1000000), th = Math.floor((val % 1000000) / 1000), rem = val % 1000;
     let str = '';
     if (m > 0) str += parseGroup(m, false, ['миллион', 'миллиона', 'миллионов']);
     if (th > 0) str += parseGroup(th, true, ['тысяча', 'тысячи', 'тысяч']);
     str += parseGroup(rem, false, null);
-
     str = str.trim() + ' ' + config[country].curText;
     const subStr = sub < 10 ? '0'+sub : sub;
     const finalStr = `${str} ${subStr} ${config[country].subunits}`;
-    
     return finalStr.charAt(0).toUpperCase() + finalStr.slice(1);
 }
 
-// --- АВТОРИЗАЦИЯ И СТАРТ ---
 document.getElementById('guest-btn').onclick = () => { isGuest = true; startApp(); };
 document.getElementById('login-btn').onclick = () => handleAuth('login');
-
-// Всплывающее окно регистрации
 document.getElementById('reg-btn').onclick = () => document.getElementById('reg-modal').classList.remove('hidden');
 window.closeRegModal = () => document.getElementById('reg-modal').classList.add('hidden');
 document.getElementById('submit-reg-btn').onclick = () => handleAuth('signup');
-
-document.getElementById('logout-btn').onclick = async () => {
-    await db.auth.signOut();
-    location.reload();
-};
+document.getElementById('logout-btn').onclick = async () => { await db.auth.signOut(); location.reload(); };
 
 async function handleAuth(type) {
     let email, password;
@@ -102,28 +72,11 @@ async function handleAuth(type) {
         email = document.getElementById('reg-email').value;
         password = document.getElementById('reg-password').value;
     }
-
-    if(!email || password.length < 6) return alert("Введите email и пароль от 6 символов");
-
-    const { data, error } = (type === 'login') 
-        ? await db.auth.signInWithPassword({ email, password })
-        : await db.auth.signUp({ email, password });
-
-    if (error) {
-        alert(error.message);
-    } else if (type === 'signup') {
-        alert("Регистрация успешна! Теперь вы можете войти.");
-        closeRegModal();
-    } else { 
-        currentUser = data.user; 
-        isGuest = false; 
-        
-        document.getElementById('user-display').innerText = currentUser.email;
-        document.getElementById('user-display').classList.remove('hidden');
-        document.getElementById('auto-save-hint').classList.remove('hidden');
-        
-        startApp(); 
-    }
+    if(!email || password.length < 6) return alert("Минимум 6 символов");
+    const { data, error } = (type === 'login') ? await db.auth.signInWithPassword({ email, password }) : await db.auth.signUp({ email, password });
+    if (error) alert(error.message);
+    else if (type === 'signup') { alert("Успешно! Войдите в аккаунт."); closeRegModal(); }
+    else { location.reload(); }
 }
 
 function startApp() {
@@ -131,15 +84,10 @@ function startApp() {
     document.getElementById('app-section').classList.remove('hidden');
     document.getElementById('logout-btn').classList.remove('hidden');
     document.getElementById('doc-date').valueAsDate = new Date();
-    
     if(!isGuest) { document.getElementById('history-box').classList.remove('hidden'); loadHistory(); }
-    renderCountryBtns(); 
-    renderForm(); 
-    renderItemsInputs();
-    updatePreview();
+    renderCountryBtns(); renderForm(); renderItemsInputs(); updatePreview();
 }
 
-// --- ИНТЕРФЕЙС ---
 function renderCountryBtns() {
     document.getElementById('country-btns').innerHTML = Object.keys(config).map(c => `
         <button onclick="setCountry('${c}')" class="p-2 rounded border flex items-center gap-2 transition ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50 hover:bg-gray-200'}">
@@ -150,7 +98,6 @@ function renderCountryBtns() {
 }
 
 window.setCountry = (c) => { selectedCountry = c; renderCountryBtns(); updatePreview(); };
-
 window.setDocType = (type) => {
     docType = type;
     document.getElementById('btn-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase';
@@ -162,22 +109,21 @@ function renderForm() {
     let staffHtml = '';
     if (docType === 'Счет') {
         staffHtml = `
-            <input type="text" id="p-ceo" placeholder="Директор (ФИО)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
+            <input type="text" id="p-ceo" placeholder="Директор (ФИО)" class="w-full p-2 border rounded text-xs mb-2 outline-none" oninput="updatePreview()">
             <input type="text" id="p-accountant" placeholder="Бухгалтер (ФИО)" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">
         `;
     } else {
         staffHtml = `
-            <input type="text" id="p-ceo-role" placeholder="Должность Исполнителя (напр. Директор)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
-            <input type="text" id="p-ceo" placeholder="ФИО Исполнителя" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
+            <input type="text" id="p-ceo-role" placeholder="Должность Исполнителя" class="w-full p-2 border rounded text-xs mb-2 outline-none" oninput="updatePreview()">
+            <input type="text" id="p-ceo" placeholder="ФИО Исполнителя" class="w-full p-2 border rounded text-xs mb-2 outline-none" oninput="updatePreview()">
             <hr class="my-2">
-            <input type="text" id="c-ceo-role" placeholder="Должность Заказчика (напр. Директор)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
+            <input type="text" id="c-ceo-role" placeholder="Должность Заказчика" class="w-full p-2 border rounded text-xs mb-2 outline-none" oninput="updatePreview()">
             <input type="text" id="c-ceo" placeholder="ФИО Заказчика" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">
         `;
     }
     document.getElementById('staff-fields').innerHTML = staffHtml;
 }
 
-// 1. Тоггл НДС
 window.toggleNds = () => {
     const isChecked = document.getElementById('include-nds').checked;
     document.getElementById('nds-rate').classList.toggle('hidden', !isChecked);
@@ -185,332 +131,79 @@ window.toggleNds = () => {
     updatePreview();
 };
 
-// --- УПРАВЛЕНИЕ ТОВАРАМИ ---
-window.addItem = () => {
-    docItems.push({ code: (docItems.length + 1).toString(), name: '', qty: 1, unit: 'шт', price: 0 });
-    renderItemsInputs();
-    updatePreview();
-};
-
-window.removeItem = (index) => {
-    if (docItems.length > 1) docItems.splice(index, 1);
-    renderItemsInputs();
-    updatePreview();
-};
-
-window.updateItem = (index, field, value) => {
-    docItems[index][field] = field === 'qty' || field === 'price' ? parseFloat(value) || 0 : value;
-    updatePreview();
-};
+window.addItem = () => { docItems.push({ code: (docItems.length + 1).toString(), name: '', qty: 1, unit: 'шт', price: 0 }); renderItemsInputs(); updatePreview(); };
+window.removeItem = (index) => { if (docItems.length > 1) docItems.splice(index, 1); renderItemsInputs(); updatePreview(); };
+window.updateItem = (index, field, value) => { docItems[index][field] = field === 'qty' || field === 'price' ? parseFloat(value) || 0 : value; updatePreview(); };
 
 function renderItemsInputs() {
     const cont = document.getElementById('items-container');
     cont.innerHTML = docItems.map((item, i) => `
         <div class="flex gap-1 items-center bg-gray-50 p-2 rounded border">
             <input type="text" value="${item.name}" oninput="updateItem(${i}, 'name', this.value)" placeholder="Название" class="flex-1 p-1 border rounded text-xs outline-none">
-            <input type="number" value="${item.qty}" oninput="updateItem(${i}, 'qty', this.value)" placeholder="Кол-во" class="w-12 p-1 border rounded text-xs outline-none text-center">
-            <input type="text" value="${item.unit}" oninput="updateItem(${i}, 'unit', this.value)" placeholder="Ед." class="w-10 p-1 border rounded text-xs outline-none text-center">
-            <input type="number" value="${item.price}" oninput="updateItem(${i}, 'price', this.value)" placeholder="Цена" class="w-20 p-1 border rounded text-xs outline-none text-right">
-            <button onclick="removeItem(${i})" class="text-red-500 px-2 text-xs font-bold hover:text-red-700">✕</button>
+            <input type="number" value="${item.qty}" oninput="updateItem(${i}, 'qty', this.value)" class="w-12 p-1 border rounded text-xs outline-none text-center">
+            <input type="text" value="${item.unit}" oninput="updateItem(${i}, 'unit', this.value)" class="w-10 p-1 border rounded text-xs outline-none text-center">
+            <input type="number" value="${item.price}" oninput="updateItem(${i}, 'price', this.value)" class="w-20 p-1 border rounded text-xs outline-none text-right">
+            <button onclick="removeItem(${i})" class="text-red-500 px-2 text-xs">✕</button>
         </div>
     `).join('');
 }
 
-// --- ПРЕДПРОСМОТР ---
 function updatePreview() {
     const val = (id) => document.getElementById(id)?.value || '';
     const dNum = val('doc-number') || '___';
-    const dDateVal = val('doc-date');
-    const dDate = dDateVal ? new Date(dDateVal).toLocaleDateString('ru-RU') : '___';
-    
-    let totalAmount = 0;
-    const itemsHtml = docItems.map((it, index) => {
-        const sum = it.qty * it.price;
-        totalAmount += sum;
-        return `
-            <tr>
-                <td style="border: 1px solid black; padding: 4px; text-align: center;">${index + 1}</td>
-                <td style="border: 1px solid black; padding: 4px; text-align: center;">${it.code || (index+1)}</td>
-                <td style="border: 1px solid black; padding: 4px;">${it.name || '&nbsp;'}</td>
-                <td style="border: 1px solid black; padding: 4px; text-align: center;">${it.qty}</td>
-                <td style="border: 1px solid black; padding: 4px; text-align: center;">${it.unit}</td>
-                <td style="border: 1px solid black; padding: 4px; text-align: right;">${it.price.toFixed(2)}</td>
-                <td style="border: 1px solid black; padding: 4px; text-align: right;">${sum.toFixed(2)}</td>
-            </tr>
-        `;
+    const dDate = val('doc-date') ? new Date(val('doc-date')).toLocaleDateString('ru-RU') : '___';
+    let total = 0;
+    const itemsRows = docItems.map((it, i) => {
+        const s = it.qty * it.price; total += s;
+        return `<tr><td style="border:1px solid #000;padding:4px;text-align:center">${i+1}</td><td style="border:1px solid #000;padding:4px;text-align:center">${it.code}</td><td style="border:1px solid #000;padding:4px">${it.name}</td><td style="border:1px solid #000;padding:4px;text-align:center">${it.qty}</td><td style="border:1px solid #000;padding:4px;text-align:center">${it.unit}</td><td style="border:1px solid #000;padding:4px;text-align:right">${it.price.toFixed(2)}</td><td style="border:1px solid #000;padding:4px;text-align:right">${s.toFixed(2)}</td></tr>`;
     }).join('');
 
-    const includeNds = document.getElementById('include-nds')?.checked;
-    const ndsRate = parseFloat(document.getElementById('nds-rate')?.value) || 0;
-    let ndsText = '0.00';
-    if (includeNds && ndsRate > 0) {
-        const ndsAmount = (totalAmount * ndsRate) / (100 + ndsRate);
-        ndsText = ndsAmount.toFixed(2);
-    }
+    const hasNds = document.getElementById('include-nds')?.checked;
+    const ndsR = parseFloat(val('nds-rate')) || 0;
+    const ndsSum = hasNds ? (total * ndsR / (100 + ndsR)).toFixed(2) : '0.00';
 
     let html = '';
     if (docType === 'Счет') {
         html = `
-            <div style="font-family: Arial, sans-serif; font-size: 10pt; color: #000; line-height: 1.3;">
-                <div style="text-align: center; font-size: 8pt; margin-bottom: 20px;">
-                    Внимание! Оплата данного счета означает согласие с условиями поставки товара.<br>
-                    Уведомление об оплате обязательно, в противном случае не гарантируется наличие<br>
-                    товара на складе. Товар отпускается по факту прихода денег на р/с Поставщика,<br>
-                    самовывозом, при наличии доверенности и документов удостоверяющих личность.
-                </div>
-                
-                <div style="font-weight: bold; margin-bottom: 2px;">Образец платежного поручения</div>
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; border: 1px solid black; text-align: center;">
-                    <tr>
-                        <td style="border: 1px solid black; text-align: left; padding: 6px; vertical-align: top;" rowspan="2" width="50%">
-                            Бенефициар:<br><strong>${val('p-name')}</strong><br><br>${config[selectedCountry].tax}: ${val('p-tax')}
-                        </td>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">ИИК</td>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">Кбе</td>
-                    </tr>
-                    <tr>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 6px;">${val('p-iik')}</td>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 6px;">${val('p-kbe')}</td>
-                    </tr>
-                    <tr>
-                        <td style="border: 1px solid black; text-align: left; padding: 6px;">
-                            Банк бенефициара:<br>${val('p-bank')}
-                        </td>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">БИК<br><span style="font-weight:normal; display:block; margin-top:5px;">${val('p-bik')}</span></td>
-                        <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">Код назначения платежа<br><span style="font-weight:normal; display:block; margin-top:5px;">${val('p-knp')}</span></td>
-                    </tr>
+            <div style="font-family:Arial;font-size:10pt;line-height:1.2">
+                <div style="text-align:center;font-size:8pt;margin-bottom:15px">Внимание! Оплата данного счета означает согласие с условиями поставки товара.</div>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #000">
+                    <tr><td rowspan="2" style="border:1px solid #000;padding:5px">Бенефициар: <b>${val('p-name')}</b><br>${config[selectedCountry].tax}: ${val('p-tax')}</td><td style="border:1px solid #000;padding:2px;background:#eee;text-align:center">ИИК</td><td style="border:1px solid #000;padding:2px;background:#eee;text-align:center">Кбе</td></tr>
+                    <tr><td style="border:1px solid #000;padding:5px;text-align:center"><b>${val('p-iik')}</b></td><td style="border:1px solid #000;padding:5px;text-align:center"><b>${val('p-kbe')}</b></td></tr>
+                    <tr><td style="border:1px solid #000;padding:5px">Банк: ${val('p-bank')}</td><td style="border:1px solid #000;padding:2px;background:#eee;text-align:center">БИК</td><td style="border:1px solid #000;padding:2px;background:#eee;text-align:center">КНП</td></tr>
+                    <tr><td style="border:1px solid #000"></td><td style="border:1px solid #000;padding:5px;text-align:center">${val('p-bik')}</td><td style="border:1px solid #000;padding:5px;text-align:center">${val('p-knp')}</td></tr>
                 </table>
-
-                <h2 style="font-size: 16pt; font-weight: bold; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 15px;">
-                    Счет на оплату №${dNum} от ${dDate}
-                </h2>
-
-                <table style="width: 100%; margin-bottom: 15px;">
-                    <tr><td style="width: 100px; vertical-align: top;">Поставщик:</td><td style="font-weight: bold;">${val('p-name')}${val('p-address') ? ', ' + val('p-address') : ''}</td></tr>
-                    <tr><td style="vertical-align: top; padding-top: 15px;">Покупатель:</td><td style="font-weight: bold; padding-top: 15px;">ИИН/БИН: ${val('c-tax')}, ${val('c-name')}${val('c-address') ? ', ' + val('c-address') : ''}</td></tr>
-                    <tr><td style="vertical-align: top; padding-top: 15px;">Договор:</td><td style="padding-top: 15px;">${val('c-contract')}</td></tr>
+                <h2 style="border-bottom:2px solid #000;margin-bottom:10px">Счет №${dNum} от ${dDate}</h2>
+                <p><b>Поставщик:</b> ${val('p-name')}, ${val('p-address')}</p>
+                <p><b>Покупатель:</b> ${val('c-name')}, ИИН/БИН: ${val('c-tax')}, ${val('c-address')}</p>
+                <p><b>Договор:</b> ${val('c-contract')}</p>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+                    <tr style="font-weight:bold;background:#eee"><td style="border:1px solid #000;padding:4px">№</td><td style="border:1px solid #000;padding:4px">Код</td><td style="border:1px solid #000;padding:4px">Наименование</td><td style="border:1px solid #000;padding:4px">Кол-во</td><td style="border:1px solid #000;padding:4px">Ед.</td><td style="border:1px solid #000;padding:4px">Цена</td><td style="border:1px solid #000;padding:4px">Сумма</td></tr>
+                    ${itemsRows}
                 </table>
-
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
-                    <thead>
-                        <tr>
-                            <th style="border: 1px solid black; padding: 4px; font-weight: bold;">№</th>
-                            <th style="border: 1px solid black; padding: 4px; font-weight: bold;">Код</th>
-                            <th style="border: 1px solid black; padding: 4px; font-weight: bold;">Наименование</th>
-                            <th style="border: 1px solid black; padding: 4px; font-weight: bold;">Кол-во</th>
-                            <th style="border: 1px solid black; padding: 4px; font-weight: bold;">Ед.</th>
-                            <th style="border: 1px solid black; padding: 4px; font-weight: bold;">Цена</th>
-                            <th style="border: 1px solid black; padding: 4px; font-weight: bold;">Сумма</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${itemsHtml}
-                    </tbody>
-                </table>
-
-                <div style="text-align: right; margin-bottom: 15px; padding-right: 5px;">
-                    <div style="font-weight: bold; margin-bottom: 4px;">Итого: <span style="display:inline-block; width: 120px; text-align:right;">${totalAmount.toFixed(2)}</span></div>
-                    <div style="font-weight: bold;">В том числе НДС: <span style="display:inline-block; width: 120px; text-align:right;">${ndsText}</span></div>
-                </div>
-
-                <div style="margin-bottom: 10px;">
-                    Всего наименований ${docItems.length}, на сумму ${totalAmount.toFixed(2)} ${config[selectedCountry].cur.toUpperCase()}<br>
-                    <strong>Всего к оплате: ${numberToWords(totalAmount, selectedCountry)}</strong>
-                </div>
-                
-                <div style="border-bottom: 3px solid black; margin-bottom: 20px;"></div>
-
-                <div>
-                    Директор <span style="display:inline-block; width: 200px; border-bottom: 1px solid black; margin-left: 10px;">${val('p-ceo')}</span> //
-                    <span style="margin-left: 30px;">Бухгалтер</span> <span style="display:inline-block; width: 200px; border-bottom: 1px solid black; margin-left: 10px;">${val('p-accountant')}</span> //
-                </div>
+                <div style="text-align:right"><b>Итого: ${total.toFixed(2)}</b><br><b>НДС: ${ndsSum}</b></div>
+                <p>Всего к оплате: <b>${numberToWords(total, selectedCountry)}</b></p>
+                <div style="margin-top:40px">Директор __________ (${val('p-ceo')}) &nbsp;&nbsp;&nbsp; Бухгалтер __________ (${val('p-accountant')})</div>
             </div>
         `;
     } else {
-        let totalItemsQty = docItems.reduce((acc, it) => acc + it.qty, 0);
-
-        // Динамическая шапка АВР только для Казахстана
-        let headerAvrHtml = selectedCountry === 'РК' ? `
-            <div style="text-align: right; margin-bottom: 10px;">
-                Приложение 50<br>к приказу Министра финансов<br>Республики Казахстан<br>от 20 декабря 2012 года № 562<br><br>
-                <div style="font-weight: normal; margin-top: 5px;">Форма Р-1</div>
-            </div>
-        ` : `<div style="height: 30px;"></div>`; // Отступ для других стран
-
+        // Убрали шапку Приложение 50 для всех, кроме Казахстана
+        let header = (selectedCountry === 'РК') ? `<div style="text-align:right;font-size:7pt">Приложение 50 к приказу МФ РК №562<br>Форма Р-1</div>` : `<div style="height:20px"></div>`;
         html = `
-            <div style="font-family: Arial, sans-serif; font-size: 8pt; color: #000; line-height: 1.2;">
-                ${headerAvrHtml}
-
-                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 15px;">
-                    <tr>
-                        <td style="width: 70%; vertical-align: bottom;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <tr>
-                                    <td style="width: 15%; padding-bottom: 5px;">Заказчик</td>
-                                    <td style="border-bottom: 1px solid black; text-align: center; font-weight: bold;">
-                                        ${val('c-name')}${val('c-address') ? ', ' + val('c-address') : ''}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td></td>
-                                    <td style="text-align: center; font-size: 6pt;">полное наименование, адрес, данные о средствах связи</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding-bottom: 5px; padding-top: 10px;">Исполнитель</td>
-                                    <td style="border-bottom: 1px solid black; text-align: center; font-weight: bold; padding-top: 10px;">
-                                        ${val('p-name')}${val('p-address') ? ', ' + val('p-address') : ''}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td></td>
-                                    <td style="text-align: center; font-size: 6pt;">полное наименование, адрес, данные о средствах связи</td>
-                                </tr>
-                            </table>
-                        </td>
-                        <td style="width: 30%; vertical-align: top; padding-left: 20px;">
-                            <div style="text-align: center; margin-bottom: 2px;">ИИН/БИН</div>
-                            <div style="border: 1px solid black; text-align: center; padding: 5px; margin-bottom: 15px;">${val('c-tax')}</div>
-                            <div style="border: 1px solid black; text-align: center; padding: 5px;">${val('p-tax')}</div>
-                        </td>
-                    </tr>
+            <div style="font-family:Arial;font-size:8pt">
+                ${header}
+                <table style="width:100%;margin-bottom:10px">
+                    <tr><td>Заказчик: <b>${val('c-name')}</b>, ${val('c-address')}</td><td style="text-align:right">БИН: ${val('c-tax')}</td></tr>
+                    <tr><td>Исполнитель: <b>${val('p-name')}</b>, ${val('p-address')}</td><td style="text-align:right">БИН: ${val('p-tax')}</td></tr>
                 </table>
-
-                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 5px;">
-                    <tr>
-                        <td style="width: 15%;">Договор (контракт)</td>
-                        <td style="border-bottom: 1px solid black; width: 45%;">${val('c-contract') || 'Без договора'}</td>
-                        <td style="width: 40%; text-align: right;">
-                            <table style="border-collapse: collapse; float: right; text-align: center;">
-                                <tr>
-                                    <td style="border: 1px solid black; padding: 2px 10px;">Номер<br>документа</td>
-                                    <td style="border: 1px solid black; padding: 2px 10px;">Дата<br>составления</td>
-                                </tr>
-                                <tr>
-                                    <td style="border: 1px solid black; padding: 2px 10px; font-weight: bold;">${dNum}</td>
-                                    <td style="border: 1px solid black; padding: 2px 10px; font-weight: bold;">${dDate}</td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
+                <h3 style="text-align:center">АКТ ВЫПОЛНЕННЫХ РАБОТ №${dNum} от ${dDate}</h3>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+                    <tr style="font-weight:bold;text-align:center"><td style="border:1px solid #000;padding:2px">№</td><td style="border:1px solid #000;padding:2px">Наименование работ</td><td style="border:1px solid #000;padding:2px">Ед.</td><td style="border:1px solid #000;padding:2px">Кол-во</td><td style="border:1px solid #000;padding:2px">Цена</td><td style="border:1px solid #000;padding:2px">Стоимость</td></tr>
+                    ${docItems.map((it, i) => `<tr><td style="border:1px solid #000;text-align:center">${i+1}</td><td style="border:1px solid #000;padding:2px">${it.name}</td><td style="border:1px solid #000;text-align:center">${it.unit}</td><td style="border:1px solid #000;text-align:center">${it.qty}</td><td style="border:1px solid #000;text-align:right">${it.price.toFixed(2)}</td><td style="border:1px solid #000;text-align:right">${(it.qty*it.price).toFixed(2)}</td></tr>`).join('')}
+                    <tr><td colspan="5" style="text-align:right;padding:2px">Итого:</td><td style="border:1px solid #000;text-align:right;font-weight:bold">${total.toFixed(2)}</td></tr>
                 </table>
-
-                <div style="text-align: center; font-weight: bold; font-size: 10pt; margin-bottom: 10px; padding-right: 180px;">
-                    АКТ ВЫПОЛНЕННЫХ РАБОТ (ОКАЗАННЫХ УСЛУГ)
-                </div>
-
-                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; text-align: center; border: 1px solid black; margin-bottom: 15px;">
-                    <thead>
-                        <tr>
-                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Номер<br>по<br>порядку</td>
-                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Наименование работ (услуг) (в разрезе их<br>подвидов в соответствии с технической<br>спецификацией, заданием, графиком выполнения<br>работ (услуг) при их наличии)</td>
-                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Дата выполнения<br>работ (оказания<br>услуг)</td>
-                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Сведения об отчете о научных<br>исследованиях, маркетинговых,<br>консультационных и прочих услугах<br>(дата, номер, количество страниц)<br>(при их наличии)</td>
-                            <td style="border: 1px solid black; padding: 4px;" rowspan="2">Единица<br>измерения</td>
-                            <td style="border: 1px solid black; padding: 4px;" colspan="3">Выполнено работ (оказано услуг)</td>
-                        </tr>
-                        <tr>
-                            <td style="border: 1px solid black; padding: 4px;">количество</td>
-                            <td style="border: 1px solid black; padding: 4px;">цена за единицу</td>
-                            <td style="border: 1px solid black; padding: 4px;">стоимость</td>
-                        </tr>
-                        <tr>
-                            <td style="border: 1px solid black; padding: 2px;">1</td>
-                            <td style="border: 1px solid black; padding: 2px;">2</td>
-                            <td style="border: 1px solid black; padding: 2px;">3</td>
-                            <td style="border: 1px solid black; padding: 2px;">4</td>
-                            <td style="border: 1px solid black; padding: 2px;">5</td>
-                            <td style="border: 1px solid black; padding: 2px;">6</td>
-                            <td style="border: 1px solid black; padding: 2px;">7</td>
-                            <td style="border: 1px solid black; padding: 2px;">8</td>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${docItems.map((it, i) => `
-                            <tr>
-                                <td style="border: 1px solid black; padding: 4px;">${i+1}</td>
-                                <td style="border: 1px solid black; padding: 4px; text-align: left;">${it.name}</td>
-                                <td style="border: 1px solid black; padding: 4px;">${dDate}</td>
-                                <td style="border: 1px solid black; padding: 4px;"></td>
-                                <td style="border: 1px solid black; padding: 4px;">${it.unit}</td>
-                                <td style="border: 1px solid black; padding: 4px;">${it.qty}</td>
-                                <td style="border: 1px solid black; padding: 4px; text-align: right;">${it.price.toFixed(2)}</td>
-                                <td style="border: 1px solid black; padding: 4px; text-align: right;">${(it.qty * it.price).toFixed(2)}</td>
-                            </tr>
-                        `).join('')}
-                        <tr>
-                            <td colspan="5" style="text-align: right; padding: 4px; border: none;">Итого</td>
-                            <td style="border: 1px solid black; padding: 4px;">${totalItemsQty}</td>
-                            <td style="border: 1px solid black; padding: 4px; text-align: center;">x</td>
-                            <td style="border: 1px solid black; padding: 4px; text-align: right;">${totalAmount.toFixed(2)}</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div style="font-size: 8pt; margin-bottom: 15px;">
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
-                        <tr>
-                            <td style="width: 320px;">Сведения об использовании запасов, полученных от заказчика</td>
-                            <td style="border-bottom: 1px solid black;"></td>
-                        </tr>
-                        <tr>
-                            <td></td>
-                            <td style="text-align: center; font-size: 6pt;">наименование, количество, стоимость</td>
-                        </tr>
-                    </table>
-                    
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="width: 630px;">Приложение: Перечень документации, в том числе отчет(ы) о маркетинговых, научных исследованиях, консультационных и прочих услугах (обязательны при его<br>(их) наличии) на <span style="display:inline-block; width: 50px; border-bottom: 1px solid black;"></span> страниц</td>
-                            <td style="border-bottom: 1px solid black; vertical-align: bottom;"></td>
-                        </tr>
-                    </table>
-                </div>
-
-                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-top: 30px;">
-                    <tr>
-                        <td style="width: 15%;">Сдал (Исполнитель)</td>
-                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('p-ceo-role') || ''}</td>
-                        <td style="width: 2%; text-align: center;">/</td>
-                        <td style="width: 15%; border-bottom: 1px solid black;"></td>
-                        <td style="width: 2%; text-align: center;">/</td>
-                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('p-ceo') || ''}</td>
-                        <td style="width: 5%;"></td>
-                        
-                        <td style="width: 12%;">Принял (Заказчик)</td>
-                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('c-ceo-role') || ''}</td>
-                        <td style="width: 2%; text-align: center;">/</td>
-                        <td style="width: 15%; border-bottom: 1px solid black;"></td>
-                        <td style="width: 2%; text-align: center;">/</td>
-                        <td style="width: 15%; border-bottom: 1px solid black; text-align: center;">${val('c-ceo') || ''}</td>
-                    </tr>
-                    <tr>
-                        <td></td>
-                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">должность</td>
-                        <td></td>
-                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">подпись</td>
-                        <td></td>
-                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">расшифровка подписи</td>
-                        <td></td>
-                        <td></td>
-                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">должность</td>
-                        <td></td>
-                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">подпись</td>
-                        <td></td>
-                        <td style="text-align: center; font-size: 6pt; padding-top: 2px;">расшифровка подписи</td>
-                    </tr>
-                </table>
-                
-                <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-top: 15px;">
-                    <tr>
-                        <td style="width: 50%;"><strong>М.П.</strong></td>
-                        <td style="width: 25%; text-align: right; padding-right: 10px;">Дата подписания (принятия) работ (услуг)</td>
-                        <td style="width: 25%; border-bottom: 1px solid black; text-align: center;">${dDate}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding-top: 15px;"><strong>М.П.</strong></td>
-                        <td></td>
-                        <td></td>
-                    </tr>
+                <table style="width:100%;margin-top:40px">
+                    <tr><td>Сдал (Исполнитель):<br>${val('p-ceo-role')}<br><br>__________ / ${val('p-ceo')}</td><td>Принял (Заказчик):<br>${val('c-ceo-role')}<br><br>__________ / ${val('c-ceo')}</td></tr>
                 </table>
             </div>
         `;
@@ -518,7 +211,6 @@ function updatePreview() {
     document.getElementById('doc-render-area').innerHTML = html;
 }
 
-// --- ИСТОРИЯ (ПОДТЯЖКА ИЗ БАЗЫ) ---
 window.switchHistoryTab = (type) => {
     activeHistoryTab = type;
     document.getElementById('tab-h-inv').className = type === 'Счет' ? 'flex-1 py-2 text-[10px] font-bold bg-white text-blue-600 border-r shadow-inner' : 'flex-1 py-2 text-[10px] font-bold bg-gray-100 text-gray-400 border-r hover:text-gray-600';
@@ -528,101 +220,47 @@ window.switchHistoryTab = (type) => {
 
 async function loadHistory() {
     if (!currentUser) return;
-    
     const { data, error } = await db.from('invoices').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-    
-    if (error) {
-        console.error("Ошибка загрузки истории:", error);
-        return;
-    }
-
-    // Сохраняем в глобальный массив, чтобы не ломать HTML при передаче объекта
+    if (error) return console.error(error);
     window.currentHistoryData = data;
-
-    const invoicesData = data.filter(d => d.document_type === 'Счет');
-    const avrData = data.filter(d => d.document_type === 'АВР');
-    
-    document.getElementById('count-inv').innerText = invoicesData.length;
-    document.getElementById('count-avr').innerText = avrData.length;
-
-    const currentTabList = activeHistoryTab === 'Счет' ? invoicesData : avrData;
+    const items = data.filter(d => d.document_type === activeHistoryTab);
+    document.getElementById('count-inv').innerText = data.filter(d => d.document_type === 'Счет').length;
+    document.getElementById('count-avr').innerText = data.filter(d => d.document_type === 'АВР').length;
     const cont = document.getElementById('history-list');
-
-    if (currentTabList.length > 0) {
-        cont.innerHTML = currentTabList.map(i => {
-            return `
-            <div class="p-2 border rounded bg-gray-50 hover:bg-blue-50 transition group relative">
-                <div class="cursor-pointer" onclick="restoreFromHistoryById('${i.id}')">
-                    <div class="flex justify-between font-bold text-[9px] text-blue-600 pr-4">
-                        <span>№${i.doc_number || 'б/н'} от ${i.doc_date ? new Date(i.doc_date).toLocaleDateString() : ''}</span>
-                        <span>${i.amount ? i.amount.toFixed(2) : 0} ${config[i.country]?.cur || ''}</span>
-                    </div>
+    if (items.length > 0) {
+        cont.innerHTML = items.map(i => `
+            <div class="p-2 border rounded bg-gray-50 hover:bg-blue-50 relative group">
+                <div class="cursor-pointer" onclick="restoreById('${i.id}')">
+                    <div class="flex justify-between font-bold text-[9px] text-blue-600 pr-4"><span>№${i.doc_number || 'б/н'}</span><span>${i.amount.toFixed(2)}</span></div>
                     <div class="text-[10px] truncate text-gray-600">${i.client_name || 'Без имени'}</div>
                 </div>
-                <button onclick="event.stopPropagation(); deleteHistoryItem('${i.id}')" class="absolute right-2 top-2 text-red-400 hover:text-red-600 hidden group-hover:block font-bold" title="Удалить">✕</button>
+                <button onclick="event.stopPropagation(); deleteItem('${i.id}')" class="absolute right-1 top-1 text-red-400 hover:text-red-600 hidden group-hover:block">✕</button>
             </div>
-        `}).join('');
-    } else {
-        cont.innerHTML = `<div class="text-center py-6 text-gray-300 text-xs">Нет данных</div>`;
-    }
+        `).join('');
+    } else { cont.innerHTML = `<div class="text-center py-4 text-gray-300 text-[10px]">Пусто</div>`; }
 }
 
-// Поиск и восстановление из безопасного массива
-window.restoreFromHistoryById = (id) => {
-    const item = window.currentHistoryData.find(d => d.id === id);
-    if (item) restoreFromHistory(item);
-};
-
-// Функция удаления (с изоляцией клика)
-window.deleteHistoryItem = async (id) => {
-    if(confirm("Удалить этот документ из истории?")) {
-        const { error } = await db.from('invoices').delete().eq('id', id);
-        if (error) {
-            console.error("Ошибка удаления:", error);
-            alert("Ошибка удаления! Убедитесь, что у вас есть права на удаление записей (RLS).");
-        } else {
-            loadHistory();
-        }
-    }
-};
-
-window.restoreFromHistory = (i) => {
-    selectedCountry = i.country;
-    docType = i.document_type;
-    
-    if (i.items && Array.isArray(i.items)) {
-        docItems = i.items;
-    } else {
-        docItems = [{ code: '1', name: i.description || '', qty: 1, unit: 'шт', price: i.amount || 0 }];
-    }
-
-    renderCountryBtns();
-    renderForm();
-    renderItemsInputs();
-    
-    const setVal = (id, val) => { if(document.getElementById(id)) document.getElementById(id).value = val || ''; }
-    
-    setVal('doc-number', i.doc_number); setVal('doc-date', i.doc_date);
-    setVal('p-name', i.provider_name); setVal('p-tax', i.provider_tax_id);
-    setVal('p-address', i.p_address); setVal('p-bank', i.provider_bank);
-    setVal('p-iik', i.p_iik); setVal('p-bik', i.p_bik);
-    setVal('p-kbe', i.p_kbe); setVal('p-knp', i.p_knp);
-    
-    setVal('p-ceo', i.provider_ceo);
-    setVal('p-accountant', i.p_accountant);
-    
-    setVal('c-name', i.client_name); setVal('c-tax', i.client_tax_id);
-    setVal('c-address', i.c_address); setVal('c-contract', i.c_contract);
-    
-    setVal('p-ceo-role', ''); setVal('c-ceo-role', ''); setVal('c-ceo', '');
-
-    if(document.getElementById('include-nds')) {
-        document.getElementById('include-nds').checked = i.include_nds || false;
-        document.getElementById('nds-rate').value = i.nds_rate || 12;
-        toggleNds();
-    }
-
+window.restoreById = (id) => {
+    const i = window.currentHistoryData.find(d => d.id === id);
+    if (!i) return;
+    selectedCountry = i.country; docType = i.document_type; docItems = i.items || [];
+    renderCountryBtns(); renderForm(); renderItemsInputs();
+    const set = (id, v) => { if(document.getElementById(id)) document.getElementById(id).value = v || ''; };
+    set('doc-number', i.doc_number); set('doc-date', i.doc_date); set('p-name', i.provider_name);
+    set('p-tax', i.provider_tax_id); set('p-address', i.p_address); set('p-bank', i.provider_bank);
+    set('p-iik', i.p_iik); set('p-bik', i.p_bik); set('p-kbe', i.p_kbe); set('p-knp', i.p_knp);
+    set('p-ceo', i.provider_ceo); set('p-accountant', i.p_accountant); set('c-name', i.client_name);
+    set('c-tax', i.client_tax_id); set('c-address', i.c_address); set('c-contract', i.c_contract);
+    set('p-ceo-role', i.p_ceo_role); set('c-ceo-role', i.c_ceo_role); set('c-ceo', i.c_ceo);
+    if(document.getElementById('include-nds')) { document.getElementById('include-nds').checked = i.include_nds; toggleNds(); }
     updatePreview();
+};
+
+window.deleteItem = async (id) => {
+    if(!confirm("Удалить?")) return;
+    const { error } = await db.from('invoices').delete().eq('id', id);
+    if (error) alert("Ошибка удаления: " + error.message);
+    else loadHistory();
 };
 
 async function downloadPDF() {
@@ -632,53 +270,23 @@ async function downloadPDF() {
 }
 
 async function saveToDB() {
-    if (isGuest || !currentUser) return;
-    
-    const currentCount = docType === 'Счет' 
-        ? parseInt(document.getElementById('count-inv').innerText) 
-        : parseInt(document.getElementById('count-avr').innerText);
-
-    if (currentCount >= 100) {
-        alert(`Достигнут лимит в 100 документов для раздела "${docType}". Пожалуйста, удалите старые записи.`);
-        return;
-    }
-
-    let totalAmount = docItems.reduce((acc, it) => acc + (it.qty * it.price), 0);
     const val = (id) => document.getElementById(id)?.value || '';
-
     const payload = {
-        user_id: currentUser.id,
-        country: selectedCountry,
-        document_type: docType,
-        doc_number: val('doc-number'),
-        doc_date: val('doc-date'),
-        provider_name: val('p-name'),
-        provider_tax_id: val('p-tax'),
-        p_address: val('p-address'),
-        provider_bank: val('p-bank'),
-        p_iik: val('p-iik'),
-        p_bik: val('p-bik'),
-        p_kbe: val('p-kbe'),
-        p_knp: val('p-knp'),
-        provider_ceo: val('p-ceo'),
-        p_accountant: val('p-accountant'),
+        user_id: currentUser.id, country: selectedCountry, document_type: docType,
+        doc_number: val('doc-number'), doc_date: val('doc-date'), provider_name: val('p-name'),
+        provider_tax_id: val('p-tax'), p_address: val('p-address'), provider_bank: val('p-bank'),
+        p_iik: val('p-iik'), p_bik: val('p-bik'), p_kbe: val('p-kbe'), p_knp: val('p-knp'),
+        provider_ceo: val('p-ceo'), p_accountant: val('p-accountant'), p_ceo_role: val('p-ceo-role'),
         include_nds: document.getElementById('include-nds')?.checked || false,
-        nds_rate: parseFloat(document.getElementById('nds-rate')?.value) || 0,
-        client_name: val('c-name'),
-        client_tax_id: val('c-tax'),
-        c_address: val('c-address'),
-        c_contract: val('c-contract'),
-        amount: totalAmount,
+        nds_rate: parseFloat(val('nds-rate')) || 0, client_name: val('c-name'),
+        client_tax_id: val('c-tax'), c_address: val('c-address'), c_contract: val('c-contract'),
+        c_ceo: val('c-ceo'), c_ceo_role: val('c-ceo-role'),
+        amount: docItems.reduce((acc, it) => acc + (it.qty * it.price), 0),
         items: docItems
     };
-    
     const { error } = await db.from('invoices').insert([payload]);
-    
-    // Вывод явной подсказки, если в базе забыли добавить новые колонки
     if (error) {
-        console.error("Ошибка сохранения в базу:", error);
-        alert("Ошибка! Не удалось сохранить документ. \nСкорее всего, в базе данных Supabase не хватает новых колонок (p_accountant, include_nds, nds_rate). \n\nВыполните SQL-запрос для обновления таблицы.");
-    } else {
-        switchHistoryTab(docType);
-    }
+        console.error("DB Error:", error);
+        alert("ОШИБКА БАЗЫ: " + error.message + "\nКод: " + error.code);
+    } else { loadHistory(); }
 }
