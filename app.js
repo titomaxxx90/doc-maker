@@ -15,11 +15,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         currentUser = session.user;
         document.getElementById('user-display').innerText = currentUser.email;
         document.getElementById('user-display').classList.remove('hidden');
+        document.getElementById('logout-btn').classList.remove('hidden'); // Кнопка выход
         document.getElementById('auto-save-hint').classList.remove('hidden');
         startApp();
     }
 });
 
+// --- СУММА ПРОПИСЬЮ ---
 function numberToWords(amount, country) {
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
@@ -52,10 +54,10 @@ function numberToWords(amount, country) {
     str += parseGroup(rem, false, null);
     str = str.trim() + ' ' + config[country].curText;
     const subStr = sub < 10 ? '0'+sub : sub;
-    const res = str.charAt(0).toUpperCase() + str.slice(1) + ` ${subStr} ${config[country].subunits}`;
-    return res;
+    return (str.charAt(0).toUpperCase() + str.slice(1) + ` ${subStr} ${config[country].subunits}`);
 }
 
+// --- АВТОРИЗАЦИЯ ---
 document.getElementById('guest-btn').onclick = () => { isGuest = true; startApp(); };
 document.getElementById('login-btn').onclick = () => handleAuth('login');
 document.getElementById('reg-btn').onclick = () => document.getElementById('reg-modal').classList.remove('hidden');
@@ -77,23 +79,7 @@ function startApp() {
     renderCountryBtns(); renderItemsInputs(); updatePreview();
 }
 
-function renderCountryBtns() {
-    document.getElementById('country-btns').innerHTML = Object.keys(config).map(c => `
-        <button onclick="setCountry('${c}')" class="p-2 rounded border flex flex-col items-center gap-1 transition ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50 hover:bg-gray-100'}">
-            <span class="text-xl">${config[c].flag}</span>
-            <span class="text-[9px] font-bold uppercase text-center">${config[c].name}</span>
-        </button>
-    `).join('');
-}
-
-window.setCountry = (c) => { selectedCountry = c; renderCountryBtns(); updatePreview(); };
-window.setDocType = (type) => {
-    docType = type;
-    document.getElementById('btn-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase';
-    document.getElementById('btn-avr').className = type === 'АВР' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase';
-    updatePreview();
-};
-
+// --- УПРАВЛЕНИЕ ТАБЛИЦЕЙ ТОВАРОВ ---
 window.addItem = () => { docItems.push({ code: (docItems.length + 1).toString(), name: '', qty: 1, unit: 'шт', price: 0 }); renderItemsInputs(); updatePreview(); };
 window.removeItem = (index) => { if (docItems.length > 1) docItems.splice(index, 1); renderItemsInputs(); updatePreview(); };
 window.updateItem = (index, field, value) => { docItems[index][field] = (field === 'qty' || field === 'price') ? parseFloat(value) || 0 : value; updatePreview(); };
@@ -102,7 +88,7 @@ function renderItemsInputs() {
     const cont = document.getElementById('items-container');
     cont.innerHTML = docItems.map((item, i) => `
         <div class="flex gap-1 items-center bg-gray-50 p-2 rounded border">
-            <input type="text" value="${item.name}" oninput="updateItem(${i}, 'name', this.value)" placeholder="Название услуги/товара" class="flex-1 p-1 border rounded text-xs outline-none">
+            <input type="text" value="${item.name}" oninput="updateItem(${i}, 'name', this.value)" placeholder="Услуга/товар" class="flex-1 p-1 border rounded text-xs outline-none">
             <input type="number" value="${item.qty}" oninput="updateItem(${i}, 'qty', this.value)" class="w-12 p-1 border rounded text-xs text-center">
             <input type="text" value="${item.unit}" oninput="updateItem(${i}, 'unit', this.value)" class="w-10 p-1 border rounded text-xs text-center">
             <input type="number" value="${item.price}" oninput="updateItem(${i}, 'price', this.value)" class="w-20 p-1 border rounded text-xs text-right">
@@ -111,6 +97,24 @@ function renderItemsInputs() {
     `).join('');
 }
 
+// --- ПЕРЕКЛЮЧАТЕЛИ СТРАН И ТИПОВ ---
+function renderCountryBtns() {
+    document.getElementById('country-btns').innerHTML = Object.keys(config).map(c => `
+        <button onclick="setCountry('${c}')" class="p-2 rounded border flex flex-col items-center gap-1 transition ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50 hover:bg-gray-100'}">
+            <span class="text-xl">${config[c].flag}</span>
+            <span class="text-[9px] font-bold uppercase">${config[c].name}</span>
+        </button>
+    `).join('');
+}
+window.setCountry = (c) => { selectedCountry = c; renderCountryBtns(); updatePreview(); };
+window.setDocType = (type) => {
+    docType = type;
+    document.getElementById('btn-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs';
+    document.getElementById('btn-avr').className = type === 'АВР' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs';
+    updatePreview();
+};
+
+// --- ПРЕДПРОСМОТР (ДИЗАЙН ИЗ ФАЙЛА) ---
 function updatePreview() {
     const v = (id) => document.getElementById(id)?.value || '';
     const dNum = v('doc-number') || '___';
@@ -125,12 +129,12 @@ function updatePreview() {
     let html = '';
     if (docType === 'Счет') {
         html = `
-            <div style="font-family:Arial;font-size:10pt;">
+            <div style="font-family:Arial;font-size:10pt;color:#000">
                 <table style="width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #000">
                     <tr><td style="border:1px solid #000;padding:5px">Поставщик: <b>${v('p-name')}</b><br>${config[selectedCountry].tax}: ${v('p-tax')}</td><td style="border:1px solid #000;padding:5px">ИИК: ${v('p-iik')}<br>БИК: ${v('p-bik')}</td></tr>
                 </table>
                 <h2 style="text-align:center">Счет на оплату №${dNum} от ${dDate}</h2>
-                <p><b>Покупатель:</b> ${v('c-name')}, ${v('c-tax')}</p>
+                <p><b>Заказчик:</b> ${v('c-name')}, ${v('c-tax')}</p>
                 <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
                     <tr style="background:#eee;font-weight:bold"><td style="border:1px solid #000;padding:4px">№</td><td style="border:1px solid #000;padding:4px">Наименование</td><td style="border:1px solid #000;padding:4px">Кол-во</td><td style="border:1px solid #000;padding:4px">Ед.</td><td style="border:1px solid #000;padding:4px">Цена</td><td style="border:1px solid #000;padding:4px">Сумма</td></tr>
                     ${rows}
@@ -140,50 +144,51 @@ function updatePreview() {
                 <div style="margin-top:30px">Руководитель: ___________ / ${v('p-ceo')}</div>
             </div>`;
     } else {
-        let header = (selectedCountry === 'РК') ? `<div style="text-align:right;font-size:7pt">Приложение 50 к приказу МФ РК №562<br>Форма Р-1</div>` : `<div style="height:20px"></div>`;
         html = `
-            <div style="font-family:Arial;font-size:9pt">
-                ${header}
-                <h3 style="text-align:center;text-transform:uppercase">Акт выполненных работ №${dNum} от ${dDate}</h3>
+            <div style="font-family:Arial;font-size:9pt;color:#000">
+                <div style="text-align:right;font-size:7pt">${selectedCountry === 'РК' ? 'Приложение 50 к приказу МФ РК №562<br>Форма Р-1' : ''}</div>
+                <h3 style="text-align:center">АКТ ВЫПОЛНЕННЫХ РАБОТ №${dNum} от ${dDate}</h3>
                 <p><b>Исполнитель:</b> ${v('p-name')}, ${v('p-tax')}</p>
                 <p><b>Заказчик:</b> ${v('c-name')}, ${v('c-tax')}</p>
                 <table style="width:100%;border-collapse:collapse;margin-top:10px">
                     <tr style="background:#eee;text-align:center;font-weight:bold"><td style="border:1px solid #000">№</td><td style="border:1px solid #000">Наименование работ</td><td style="border:1px solid #000">Кол-во</td><td style="border:1px solid #000">Цена</td><td style="border:1px solid #000">Сумма</td></tr>
                     ${rows}
                 </table>
-                <p style="text-align:right;font-weight:bold;margin-top:5px">Итого к оплате: ${total.toFixed(2)} ${config[selectedCountry].cur}</p>
-                <div style="display:flex;justify-content:space-between;margin-top:50px">
-                    <div style="width:45%">От Исполнителя:<br><br>__________ / ${v('p-ceo')}</div>
-                    <div style="width:45%">От Заказчика:<br><br>__________ / </div>
+                <p style="text-align:right;font-weight:bold">Итого: ${total.toFixed(2)}</p>
+                <div style="display:flex;justify-content:space-between;margin-top:40px">
+                    <div>От Исполнителя:<br><br>__________ / ${v('p-ceo')}</div>
+                    <div>От Заказчика:<br><br>__________ / </div>
                 </div>
             </div>`;
     }
     document.getElementById('doc-render-area').innerHTML = html;
 }
 
+// --- ИСТОРИЯ И УДАЛЕНИЕ ---
 async function loadHistory() {
     if (!currentUser) return;
     const { data, error } = await db.from('invoices').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
     if (error) return;
     window.currentHistoryData = data;
     const items = data.filter(d => d.document_type === activeHistoryTab);
+    
     document.getElementById('count-inv').innerText = data.filter(d => d.document_type === 'Счет').length;
     document.getElementById('count-avr').innerText = data.filter(d => d.document_type === 'АВР').length;
-    
+
     const cont = document.getElementById('history-list');
     cont.innerHTML = items.length > 0 ? items.map(i => `
         <div class="p-2 border rounded bg-gray-50 hover:bg-blue-50 relative group cursor-pointer" onclick="restoreById('${i.id}')">
             <div class="flex justify-between font-bold text-[9px] text-blue-600"><span>№${i.doc_number || 'б/н'}</span><span>${(i.amount || 0).toFixed(2)}</span></div>
             <div class="text-[10px] truncate text-gray-600">${i.client_name || 'Без имени'}</div>
-            <button onclick="event.stopPropagation(); deleteItem('${i.id}')" class="absolute right-1 top-1 text-red-300 hover:text-red-600 hidden group-hover:block">✕</button>
+            <button onclick="event.stopPropagation(); deleteItem('${i.id}')" class="absolute right-1 top-1 text-red-400 hover:text-red-600 hidden group-hover:block">✕</button>
         </div>
-    `).join('') : '<div class="text-center py-4 text-gray-300 text-[10px]">История пуста</div>';
+    `).join('') : '<div class="text-center py-4 text-gray-300 text-[10px]">Пусто</div>';
 }
 
 window.deleteItem = async (id) => {
-    if(!confirm("Удалить этот документ из истории?")) return;
+    if(!confirm("Удалить?")) return;
     const { error } = await db.from('invoices').delete().eq('id', id);
-    if (error) alert("Ошибка при удалении: " + error.message); else loadHistory();
+    if (error) alert("Ошибка: " + error.message); else loadHistory();
 };
 
 window.switchHistoryTab = (type) => {
@@ -200,36 +205,29 @@ window.restoreById = (id) => {
     selectedCountry = i.country; docType = i.document_type; docItems = i.items || [];
     s('doc-number', i.doc_number); s('doc-date', i.doc_date);
     s('p-name', i.provider_name); s('p-tax', i.provider_tax_id);
-    s('p-address', i.p_address); s('p-iik', i.p_iik); s('p-bik', i.p_bik);
-    s('p-kbe', i.p_kbe); s('p-knp', i.p_knp); s('p-ceo', i.provider_ceo);
+    s('p-iik', i.p_iik); s('p-bik', i.p_bik); s('p-ceo', i.provider_ceo);
     s('c-name', i.client_name); s('c-tax', i.client_tax_id);
-    s('c-address', i.c_address); s('c-contract', i.c_contract);
     renderCountryBtns(); renderItemsInputs(); updatePreview();
 };
 
+// --- СОХРАНЕНИЕ И PDF ---
 async function downloadPDF() {
     if(!isGuest && currentUser) await saveToDB();
     const element = document.getElementById('doc-render-area');
-    html2pdf().from(element).set({ margin: 10, filename: 'Document.pdf', html2canvas: { scale: 2 } }).save();
+    html2pdf().from(element).set({ margin: 10, filename: 'doc.pdf', html2canvas: { scale: 2 } }).save();
 }
 
 async function saveToDB() {
-    if (isGuest || !currentUser) return;
-    const gV = (id) => document.getElementById(id)?.value || '';
+    const v = (id) => document.getElementById(id)?.value || '';
     const payload = {
         user_id: currentUser.id, country: selectedCountry, document_type: docType,
-        doc_number: gV('doc-number'), doc_date: gV('doc-date'),
-        provider_name: gV('p-name'), provider_tax_id: gV('p-tax'),
-        p_address: gV('p-address'), p_iik: gV('p-iik'), p_bik: gV('p-bik'),
-        p_kbe: gV('p-kbe'), p_knp: gV('p-knp'), provider_ceo: gV('p-ceo'),
-        client_name: gV('c-name'), client_tax_id: gV('c-tax'),
-        c_address: gV('c-address'), c_contract: gV('c-contract'),
+        doc_number: v('doc-number'), doc_date: v('doc-date'),
+        provider_name: v('p-name'), provider_tax_id: v('p-tax'),
+        p_iik: v('p-iik'), p_bik: v('p-bik'), provider_ceo: v('p-ceo'),
+        client_name: v('c-name'), client_tax_id: v('c-tax'),
         amount: docItems.reduce((acc, it) => acc + (it.qty * it.price), 0),
         items: docItems
     };
     const { error } = await db.from('invoices').insert([payload]);
-    if (error) {
-        console.error("Save error:", error);
-        if (error.code === '23502') alert("Ошибка: База требует заполнить поле " + error.details);
-    } else { loadHistory(); }
+    if (error) console.error("Save error:", error.message); else loadHistory();
 }
