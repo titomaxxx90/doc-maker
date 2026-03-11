@@ -71,7 +71,7 @@
             </div>
         </section>
 
-        <!-- Модальное окно регистрации (было скрыто, теперь открывается по клику) -->
+        <!-- Модальное окно регистрации -->
         <div id="reg-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 no-print">
             <div class="bg-white p-8 rounded-2xl shadow-xl w-96 relative">
                 <button onclick="closeRegModal()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 font-bold">✕</button>
@@ -105,14 +105,19 @@
                     <input type="text" id="p-name" placeholder="Название вашей компании (Бенефициар)" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
                     <input type="text" id="p-tax" placeholder="Ваш БИН / ИНН" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
                     <input type="text" id="p-address" placeholder="Ваш адрес (Страна, Город, Улица)" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
-                    <hr class="my-2">
-                    <input type="text" id="p-bank" placeholder="Наименование Банка" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
-                    <input type="text" id="p-iik" placeholder="ИИК (Ваш расчетный счет)" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
-                    <div class="grid grid-cols-3 gap-2">
-                        <input type="text" id="p-bik" placeholder="БИК" class="p-2 border rounded text-xs" oninput="updatePreview()">
-                        <input type="text" id="p-kbe" placeholder="КБе" class="p-2 border rounded text-xs" oninput="updatePreview()">
-                        <input type="text" id="p-knp" placeholder="КНП" class="p-2 border rounded text-xs" oninput="updatePreview()">
+                    
+                    <!-- Банковские поля (будут скрыты для АВР) -->
+                    <div id="bank-fields">
+                        <hr class="my-2">
+                        <input type="text" id="p-bank" placeholder="Наименование Банка" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                        <input type="text" id="p-iik" placeholder="ИИК (Ваш расчетный счет)" class="w-full p-2 border rounded text-xs" oninput="updatePreview()">
+                        <div class="grid grid-cols-3 gap-2">
+                            <input type="text" id="p-bik" placeholder="БИК" class="p-2 border rounded text-xs" oninput="updatePreview()">
+                            <input type="text" id="p-kbe" placeholder="КБе" class="p-2 border rounded text-xs" oninput="updatePreview()">
+                            <input type="text" id="p-knp" placeholder="КНП" class="p-2 border rounded text-xs" oninput="updatePreview()">
+                        </div>
                     </div>
+
                     <div id="staff-fields" class="space-y-2 mt-2"></div>
                 </div>
 
