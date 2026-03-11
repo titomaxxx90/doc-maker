@@ -36,7 +36,7 @@ window.toggleNds = function() {
 // ---------- АВТОРИЗАЦИЯ ----------
 document.getElementById('guest-btn').onclick = () => { isGuest = true; startApp(); };
 document.getElementById('login-btn').onclick = () => handleLogin();
-document.getElementById('logout-btn').onclick = () => location.reload();
+document.getElementById('logout-btn').onclick = () => handleLogout();
 
 // Модальное окно регистрации
 window.openRegModal = function() {
@@ -56,10 +56,7 @@ window.submitRegistration = async function() {
         closeRegModal();
     }
 };
-// Назначаем обработчик на кнопку "Зарегистрироваться" внутри модалки
 document.getElementById('submit-reg-btn').onclick = submitRegistration;
-
-// Переназначаем обработчик кнопки "Регистрация" на открытие модалки (вместо прямой регистрации)
 document.getElementById('reg-btn').onclick = openRegModal;
 
 async function handleLogin() {
@@ -75,6 +72,20 @@ async function handleLogin() {
     }
 }
 
+async function handleLogout() {
+    await db.auth.signOut();
+    currentUser = null;
+    isGuest = false;
+    // Возвращаем экран авторизации
+    document.getElementById('auth-section').classList.remove('hidden');
+    document.getElementById('app-section').classList.add('hidden');
+    document.getElementById('logout-btn').classList.add('hidden');
+    document.getElementById('user-display').classList.add('hidden');
+    // Очищаем поля ввода
+    document.getElementById('email-input').value = '';
+    document.getElementById('password-input').value = '';
+}
+
 // ---------- ЗАПУСК ПРИЛОЖЕНИЯ ----------
 function startApp() {
     document.getElementById('auth-section').classList.add('hidden');
@@ -85,8 +96,14 @@ function startApp() {
     if (!isGuest) {
         document.getElementById('history-box').classList.remove('hidden');
         document.getElementById('auto-save-hint').classList.remove('hidden');
+        // Показываем email пользователя
+        const userDisplay = document.getElementById('user-display');
+        userDisplay.classList.remove('hidden');
+        userDisplay.innerText = currentUser.email;
         loadHistory();
         updateHistoryCounts();
+    } else {
+        document.getElementById('user-display').classList.add('hidden');
     }
 
     renderCountryBtns();
@@ -162,8 +179,9 @@ function renderItemsInputs() {
     `).join('');
 }
 
-// ---------- ПРЕДПРОСМОТР (ТОЧНАЯ КОПИЯ ШАБЛОНА С ДОБАВЛЕНИЕМ НДС И ПОДПИСЕЙ) ----------
+// ---------- ПРЕДПРОСМОТР ----------
 function numberToWords(amount, country) {
+    // Функция без изменений (см. исходный код)
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
     
@@ -324,15 +342,20 @@ function updatePreview() {
             </div>
         `;
     } else {
-        // Точная копия формы Р-1 (АВР) без изменений
+        // АВР (АКТ)
         let totalItemsQty = docItems.reduce((acc, it) => acc + it.qty, 0);
+        // Шапка с приложением — только для Казахстана
+        const headerKZ = (selectedCountry === 'РК') ? `
+            <div style="text-align: right; margin-bottom: 10px;">
+                Приложение 50<br>к приказу Министра финансов<br>Республики Казахстан<br>от 20 декабря 2012 года № 562<br><br>
+                <div style="font-weight: normal; margin-top: 5px;">Форма Р-1</div>
+            </div>
+        ` : '';
+
         html = `
             <div style="font-family: Arial, sans-serif; font-size: 8pt; color: #000; line-height: 1.2;">
-                <div style="text-align: right; margin-bottom: 10px;">
-                    Приложение 50<br>к приказу Министра финансов<br>Республики Казахстан<br>от 20 декабря 2012 года № 562<br><br>
-                    <div style="font-weight: normal; margin-top: 5px;">Форма Р-1</div>
-                </div>
-
+                ${headerKZ}
+                <!-- остальная часть формы АВР без изменений -->
                 <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 15px;">
                     <tr>
                         <td style="width: 70%; vertical-align: bottom;">
@@ -584,7 +607,7 @@ window.restoreFromHistory = (i) => {
     setVal('p-kbe', i.p_kbe);
     setVal('p-knp', i.p_knp);
     setVal('p-ceo', i.provider_ceo);
-    setVal('p-accountant', i.provider_accountant || ''); // новое поле
+    setVal('p-accountant', i.provider_accountant || '');
     setVal('c-name', i.client_name);
     setVal('c-tax', i.client_tax_id);
     setVal('c-address', i.c_address);
@@ -599,7 +622,7 @@ window.restoreFromHistory = (i) => {
 
 // ---------- СОХРАНЕНИЕ И PDF ----------
 async function downloadPDF() {
-    if (!isGuest) await saveToDB();
+    if (!isGuest) await saveToDB(); // всегда сохраняем для авторизованных
     const element = document.getElementById('doc-render-area');
     html2pdf().from(element).set({ margin: [10, 5, 10, 5], filename: `Document.pdf`, html2canvas: { scale: 3 } }).save();
 }
@@ -607,15 +630,26 @@ async function downloadPDF() {
 async function saveToDB() {
     if (isGuest || !currentUser) return;
     
-    let totalAmount = docItems.reduce((acc, it) => acc + (it.qty * it.price), 0);
+    const totalAmount = docItems.reduce((acc, it) => acc + (it.qty * it.price), 0);
     const val = (id) => document.getElementById(id)?.value || '';
+
+    // Гарантируем, что номер документа и дата не пустые
+    let docNumber = val('doc-number').trim();
+    if (docNumber === '') docNumber = 'б/н';
+    
+    let docDate = val('doc-date');
+    if (!docDate) {
+        // если дата не выбрана, ставим сегодня
+        const today = new Date();
+        docDate = today.toISOString().split('T')[0];
+    }
 
     const payload = {
         user_id: currentUser.id,
         country: selectedCountry,
         document_type: docType,
-        doc_number: val('doc-number'),
-        doc_date: val('doc-date'),
+        doc_number: docNumber,
+        doc_date: docDate,
         provider_name: val('p-name'),
         provider_tax_id: val('p-tax'),
         p_address: val('p-address'),
@@ -625,7 +659,7 @@ async function saveToDB() {
         p_kbe: val('p-kbe'),
         p_knp: val('p-knp'),
         provider_ceo: val('p-ceo'),
-        provider_accountant: val('p-accountant'), // новое поле
+        provider_accountant: val('p-accountant'),
         client_name: val('c-name'),
         client_tax_id: val('c-tax'),
         c_address: val('c-address'),
@@ -636,7 +670,8 @@ async function saveToDB() {
     
     const { error } = await db.from('invoices').insert([payload]);
     if (error) console.error("Ошибка сохранения в базу данных:", error);
-
-    // Принудительно переключаем историю на тип созданного документа, чтобы он сразу появился в списке
-    switchHistoryTab(docType);
+    else {
+        // Принудительно обновляем историю после успешного сохранения
+        switchHistoryTab(docType);
+    }
 }
