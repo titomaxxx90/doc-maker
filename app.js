@@ -1,6 +1,6 @@
 let currentUser = null, selectedCountry = 'РК', docType = 'Счет', isGuest = false, activeHistoryTab = 'Счет';
 
-// Массив для хранения позиций в счете
+// Массив для хранения позиций
 let docItems = [{ code: '1', name: '', qty: 1, unit: 'шт', price: 0 }];
 
 const config = {
@@ -10,7 +10,20 @@ const config = {
     'КР': { name: 'Кыргызстан', tax: 'ИНН', cur: 'KGS', flag: '🇰🇬', subunits: 'тыйын', curText: 'сомов' }
 };
 
-// --- СУММА ПРОПИСЬЮ (Улучшенная для больших чисел) ---
+// 7. Проверка сессии при загрузке страницы
+window.addEventListener('DOMContentLoaded', async () => {
+    const { data: { session } } = await db.auth.getSession();
+    if (session) {
+        currentUser = session.user;
+        isGuest = false;
+        document.getElementById('user-display').innerText = currentUser.email;
+        document.getElementById('user-display').classList.remove('hidden');
+        document.getElementById('auto-save-hint').classList.remove('hidden');
+        startApp();
+    }
+});
+
+// --- СУММА ПРОПИСЬЮ ---
 function numberToWords(amount, country) {
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
@@ -66,21 +79,48 @@ function numberToWords(amount, country) {
 // --- АВТОРИЗАЦИЯ И СТАРТ ---
 document.getElementById('guest-btn').onclick = () => { isGuest = true; startApp(); };
 document.getElementById('login-btn').onclick = () => handleAuth('login');
-document.getElementById('reg-btn').onclick = () => handleAuth('signup');
-document.getElementById('logout-btn').onclick = () => location.reload();
+
+// 6. Всплывающее окно регистрации
+document.getElementById('reg-btn').onclick = () => document.getElementById('reg-modal').classList.remove('hidden');
+window.closeRegModal = () => document.getElementById('reg-modal').classList.add('hidden');
+document.getElementById('submit-reg-btn').onclick = () => handleAuth('signup');
+
+document.getElementById('logout-btn').onclick = async () => {
+    await db.auth.signOut();
+    location.reload();
+};
 
 async function handleAuth(type) {
-    const email = document.getElementById('email-input').value;
-    const password = document.getElementById('password-input').value;
+    let email, password;
+    if (type === 'login') {
+        email = document.getElementById('email-input').value;
+        password = document.getElementById('password-input').value;
+    } else {
+        email = document.getElementById('reg-email').value;
+        password = document.getElementById('reg-password').value;
+    }
+
     if(!email || password.length < 6) return alert("Введите email и пароль от 6 символов");
 
     const { data, error } = (type === 'login') 
         ? await db.auth.signInWithPassword({ email, password })
         : await db.auth.signUp({ email, password });
 
-    if (error) alert(error.message);
-    else if (type === 'signup') alert("Регистрация успешна!");
-    else { currentUser = data.user; isGuest = false; startApp(); }
+    if (error) {
+        alert(error.message);
+    } else if (type === 'signup') {
+        alert("Регистрация успешна! Теперь вы можете войти.");
+        closeRegModal();
+    } else { 
+        currentUser = data.user; 
+        isGuest = false; 
+        
+        document.getElementById('user-display').innerText = currentUser.email;
+        document.getElementById('user-display').classList.remove('hidden');
+        document.getElementById('auto-save-hint').classList.remove('hidden');
+        
+        startApp(); 
+    }
 }
 
 function startApp() {
@@ -118,9 +158,13 @@ window.setDocType = (type) => {
 function renderForm() {
     let staffHtml = '';
     if (docType === 'Счет') {
-        staffHtml = `<input type="text" id="p-ceo" placeholder="ФИО Исполнителя / Руководителя" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">`;
+        // 11. Исполнитель заменен на Директор, добавлен Бухгалтер
+        staffHtml = `
+            <input type="text" id="p-ceo" placeholder="Директор (ФИО)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
+            <input type="text" id="p-accountant" placeholder="Бухгалтер (ФИО)" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">
+        `;
     } else {
-        // Добавлены поля специально для Формы Р-1
+        // Форма Р-1 (АВР)
         staffHtml = `
             <input type="text" id="p-ceo-role" placeholder="Должность Исполнителя (напр. Директор)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
             <input type="text" id="p-ceo" placeholder="ФИО Исполнителя" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
@@ -131,6 +175,14 @@ function renderForm() {
     }
     document.getElementById('staff-fields').innerHTML = staffHtml;
 }
+
+// 1. Тоггл НДС
+window.toggleNds = () => {
+    const isChecked = document.getElementById('include-nds').checked;
+    document.getElementById('nds-rate').classList.toggle('hidden', !isChecked);
+    document.getElementById('nds-label').classList.toggle('hidden', !isChecked);
+    updatePreview();
+};
 
 // --- УПРАВЛЕНИЕ ТОВАРАМИ ---
 window.addItem = () => {
@@ -163,14 +215,13 @@ function renderItemsInputs() {
     `).join('');
 }
 
-// --- ПРЕДПРОСМОТР (ТОЧНАЯ КОПИЯ ШАБЛОНА) ---
+// --- ПРЕДПРОСМОТР ---
 function updatePreview() {
     const val = (id) => document.getElementById(id)?.value || '';
     const dNum = val('doc-number') || '___';
     const dDateVal = val('doc-date');
     const dDate = dDateVal ? new Date(dDateVal).toLocaleDateString('ru-RU') : '___';
     
-    // Подсчет итогов
     let totalAmount = 0;
     const itemsHtml = docItems.map((it, index) => {
         const sum = it.qty * it.price;
@@ -187,6 +238,15 @@ function updatePreview() {
             </tr>
         `;
     }).join('');
+
+    // Расчет НДС из общей суммы (в том числе)
+    const includeNds = document.getElementById('include-nds')?.checked;
+    const ndsRate = parseFloat(document.getElementById('nds-rate')?.value) || 0;
+    let ndsText = '0.00';
+    if (includeNds && ndsRate > 0) {
+        const ndsAmount = (totalAmount * ndsRate) / (100 + ndsRate);
+        ndsText = ndsAmount.toFixed(2);
+    }
 
     let html = '';
     if (docType === 'Счет') {
@@ -214,7 +274,7 @@ function updatePreview() {
                     </tr>
                     <tr>
                         <td style="border: 1px solid black; text-align: left; padding: 6px;">
-                            Банк бенефициара:<br>${val('p-bank')}
+                            Банк бенефицира:<br>${val('p-bank')}
                         </td>
                         <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">БИК<br><span style="font-weight:normal; display:block; margin-top:5px;">${val('p-bik')}</span></td>
                         <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">Код назначения платежа<br><span style="font-weight:normal; display:block; margin-top:5px;">${val('p-knp')}</span></td>
@@ -250,7 +310,7 @@ function updatePreview() {
 
                 <div style="text-align: right; margin-bottom: 15px; padding-right: 5px;">
                     <div style="font-weight: bold; margin-bottom: 4px;">Итого: <span style="display:inline-block; width: 120px; text-align:right;">${totalAmount.toFixed(2)}</span></div>
-                    <div style="font-weight: bold;">В том числе НДС: <span style="display:inline-block; width: 120px; text-align:right;">0.00</span></div>
+                    <div style="font-weight: bold;">В том числе НДС: <span style="display:inline-block; width: 120px; text-align:right;">${ndsText}</span></div>
                 </div>
 
                 <div style="margin-bottom: 10px;">
@@ -261,12 +321,12 @@ function updatePreview() {
                 <div style="border-bottom: 3px solid black; margin-bottom: 20px;"></div>
 
                 <div>
-                    Исполнитель <span style="display:inline-block; width: 300px; border-bottom: 1px solid black; margin-left: 15px;">${val('p-ceo')}</span> //
+                    Директор <span style="display:inline-block; width: 200px; border-bottom: 1px solid black; margin-left: 10px;">${val('p-ceo')}</span> //
+                    <span style="margin-left: 30px;">Бухгалтер</span> <span style="display:inline-block; width: 200px; border-bottom: 1px solid black; margin-left: 10px;">${val('p-accountant')}</span> //
                 </div>
             </div>
         `;
     } else {
-        // Точная копия формы Р-1 (АВР)
         let totalItemsQty = docItems.reduce((acc, it) => acc + it.qty, 0);
 
         html = `
@@ -463,28 +523,59 @@ window.switchHistoryTab = (type) => {
 
 async function loadHistory() {
     if (!currentUser) return;
-    const { data } = await db.from('invoices').select('*').eq('user_id', currentUser.id).eq('document_type', activeHistoryTab).order('created_at', { ascending: false });
+    
+    // 2. Исправленная подтяжка (с обработкой ошибок)
+    const { data, error } = await db.from('invoices').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+    
+    if (error) {
+        console.error("Ошибка загрузки истории:", error);
+        return;
+    }
+
+    // Разделяем данные для счетчиков
+    const invoicesData = data.filter(d => d.document_type === 'Счет');
+    const avrData = data.filter(d => d.document_type === 'АВР');
+    
+    // 5. Установка значений лимитов
+    document.getElementById('count-inv').innerText = invoicesData.length;
+    document.getElementById('count-avr').innerText = avrData.length;
+
+    const currentTabList = activeHistoryTab === 'Счет' ? invoicesData : avrData;
     const cont = document.getElementById('history-list');
-    if (data && data.length > 0) {
-        cont.innerHTML = data.map(i => `
-            <div onclick='restoreFromHistory(${JSON.stringify(i)})' class="p-2 border rounded bg-gray-50 hover:bg-blue-50 cursor-pointer transition">
-                <div class="flex justify-between font-bold text-[9px] text-blue-600">
-                    <span>№${i.doc_number || 'б/н'} от ${i.doc_date ? new Date(i.doc_date).toLocaleDateString() : ''}</span>
-                    <span>${i.amount ? i.amount.toFixed(2) : 0} ${config[i.country]?.cur || ''}</span>
+
+    if (currentTabList.length > 0) {
+        // Экранируем кавычки в JSON, чтобы HTML не "ломался"
+        cont.innerHTML = currentTabList.map(i => {
+            const safeJSON = JSON.stringify(i).replace(/'/g, "&#39;");
+            return `
+            <div class="p-2 border rounded bg-gray-50 hover:bg-blue-50 transition group relative">
+                <div class="cursor-pointer" onclick='restoreFromHistory(${safeJSON})'>
+                    <div class="flex justify-between font-bold text-[9px] text-blue-600 pr-4">
+                        <span>№${i.doc_number || 'б/н'} от ${i.doc_date ? new Date(i.doc_date).toLocaleDateString() : ''}</span>
+                        <span>${i.amount ? i.amount.toFixed(2) : 0} ${config[i.country]?.cur || ''}</span>
+                    </div>
+                    <div class="text-[10px] truncate text-gray-600">${i.client_name || 'Без имени'}</div>
                 </div>
-                <div class="text-[10px] truncate text-gray-600">${i.client_name || 'Без имени'}</div>
+                <button onclick="deleteHistoryItem('${i.id}')" class="absolute right-2 top-2 text-red-400 hover:text-red-600 hidden group-hover:block font-bold" title="Удалить">✕</button>
             </div>
-        `).join('');
+        `}).join('');
     } else {
         cont.innerHTML = `<div class="text-center py-6 text-gray-300 text-xs">Нет данных</div>`;
     }
 }
 
+// Функция удаления
+window.deleteHistoryItem = async (id) => {
+    if(confirm("Удалить этот документ из истории?")) {
+        await db.from('invoices').delete().eq('id', id);
+        loadHistory();
+    }
+};
+
 window.restoreFromHistory = (i) => {
     selectedCountry = i.country;
     docType = i.document_type;
     
-    // Восстанавливаем массив товаров
     if (i.items && Array.isArray(i.items)) {
         docItems = i.items;
     } else {
@@ -502,19 +593,27 @@ window.restoreFromHistory = (i) => {
     setVal('p-address', i.p_address); setVal('p-bank', i.provider_bank);
     setVal('p-iik', i.p_iik); setVal('p-bik', i.p_bik);
     setVal('p-kbe', i.p_kbe); setVal('p-knp', i.p_knp);
+    
     setVal('p-ceo', i.provider_ceo);
+    setVal('p-accountant', i.p_accountant); // Подтягиваем бухгалтера
     
     setVal('c-name', i.client_name); setVal('c-tax', i.client_tax_id);
     setVal('c-address', i.c_address); setVal('c-contract', i.c_contract);
     
-    // Очищаем локальные поля ролей, т.к. они не сохраняются в основную схему БД, чтобы не вызывать ошибку
     setVal('p-ceo-role', ''); setVal('c-ceo-role', ''); setVal('c-ceo', '');
+
+    // Подтягиваем НДС
+    if(document.getElementById('include-nds')) {
+        document.getElementById('include-nds').checked = i.include_nds || false;
+        document.getElementById('nds-rate').value = i.nds_rate || 12;
+        toggleNds();
+    }
 
     updatePreview();
 };
 
 async function downloadPDF() {
-    if(!isGuest) await saveToDB();
+    if(!isGuest && currentUser) await saveToDB();
     const element = document.getElementById('doc-render-area');
     html2pdf().from(element).set({ margin: [10, 5, 10, 5], filename: `Document.pdf`, html2canvas: { scale: 3 } }).save();
 }
@@ -522,6 +621,16 @@ async function downloadPDF() {
 async function saveToDB() {
     if (isGuest || !currentUser) return;
     
+    // 5. Проверка лимитов перед сохранением
+    const currentCount = docType === 'Счет' 
+        ? parseInt(document.getElementById('count-inv').innerText) 
+        : parseInt(document.getElementById('count-avr').innerText);
+
+    if (currentCount >= 100) {
+        alert(`Достигнут лимит в 100 документов для раздела "${docType}". Пожалуйста, удалите старые записи, чтобы сохранить новые.`);
+        return;
+    }
+
     let totalAmount = docItems.reduce((acc, it) => acc + (it.qty * it.price), 0);
     const val = (id) => document.getElementById(id)?.value || '';
 
@@ -540,6 +649,9 @@ async function saveToDB() {
         p_kbe: val('p-kbe'),
         p_knp: val('p-knp'),
         provider_ceo: val('p-ceo'),
+        p_accountant: val('p-accountant'),
+        include_nds: document.getElementById('include-nds')?.checked || false,
+        nds_rate: parseFloat(document.getElementById('nds-rate')?.value) || 0,
         client_name: val('c-name'),
         client_tax_id: val('c-tax'),
         c_address: val('c-address'),
@@ -549,8 +661,10 @@ async function saveToDB() {
     };
     
     const { error } = await db.from('invoices').insert([payload]);
-    if (error) console.error("Ошибка сохранения в базу данных:", error);
+    if (error) {
+        console.error("Ошибка сохранения в базу:", error);
+        alert("Ошибка при сохранении в базу. Убедитесь, что все необходимые колонки (p_accountant, include_nds, nds_rate) созданы в Supabase.");
+    }
 
-    // ФИКС БАГА: Принудительно переключаем историю на тип созданного документа, чтобы он сразу появился в списке!
     switchHistoryTab(docType);
 }
