@@ -2,10 +2,42 @@ let currentUser = null, selectedCountry = 'РК', docType = 'Счет', isGuest 
 let docItems = [{ code: '1', name: '', qty: 1, unit: 'шт', price: 0 }];
 
 const config = {
-    'РК': { name: 'Казахстан', tax: 'БИН/ИИН', cur: 'KZT', flag: '🇰🇿', subunits: 'тиын', curText: 'тенге' },
-    'РФ': { name: 'Россия', tax: 'ИНН/КПП', cur: 'RUB', flag: '🇷🇺', subunits: 'коп.', curText: 'рублей' },
-    'РБ': { name: 'Беларусь', tax: 'УНП', cur: 'BYN', flag: '🇧🇾', subunits: 'коп.', curText: 'бел. рублей' },
-    'КР': { name: 'Кыргызстан', tax: 'ИНН', cur: 'KGS', flag: '🇰🇬', subunits: 'тыйын', curText: 'сомов' }
+    'РК': { 
+        name: 'Казахстан', 
+        tax: 'БИН/ИИН', 
+        taxLabel: 'ИИН/БИН',  // для отображения в предпросмотре
+        cur: 'KZT', 
+        flag: '🇰🇿', 
+        subunits: 'тиын', 
+        curText: 'тенге' 
+    },
+    'РФ': { 
+        name: 'Россия', 
+        tax: 'ИНН/КПП', 
+        taxLabel: 'ИНН/КПП',
+        cur: 'RUB', 
+        flag: '🇷🇺', 
+        subunits: 'коп.', 
+        curText: 'рублей' 
+    },
+    'РБ': { 
+        name: 'Беларусь', 
+        tax: 'УНП', 
+        taxLabel: 'УНП',
+        cur: 'BYN', 
+        flag: '🇧🇾', 
+        subunits: 'коп.', 
+        curText: 'бел. рублей' 
+    },
+    'КР': { 
+        name: 'Кыргызстан', 
+        tax: 'ИНН', 
+        taxLabel: 'ИНН',
+        cur: 'KGS', 
+        flag: '🇰🇬', 
+        subunits: 'тыйын', 
+        curText: 'сомов' 
+    }
 };
 
 // ---------- ПРОВЕРКА СЕССИИ ПРИ ЗАГРУЗКЕ ----------
@@ -126,7 +158,6 @@ window.setDocType = (type) => {
     document.getElementById('btn-inv').className = type === 'Счет' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase';
     document.getElementById('btn-avr').className = type === 'АВР' ? 'flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold text-xs uppercase' : 'flex-1 py-2 rounded-lg bg-gray-100 text-gray-500 font-bold text-xs uppercase';
     
-    // Показываем или скрываем банковские поля в зависимости от типа документа
     const bankFields = document.getElementById('bank-fields');
     if (bankFields) {
         if (type === 'Счет') {
@@ -189,7 +220,6 @@ function renderItemsInputs() {
 
 // ---------- ПРЕДПРОСМОТР ----------
 function numberToWords(amount, country) {
-    // ... (функция без изменений, сохранена из исходного кода)
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
     
@@ -356,6 +386,9 @@ function updatePreview() {
             </div>
         ` : '';
 
+        // Используем taxLabel из config для отображения в предпросмотре
+        const taxLabel = config[selectedCountry].taxLabel;
+
         html = `
             <div style="font-family: Arial, sans-serif; font-size: 8pt; color: #000; line-height: 1.2;">
                 ${headerKZ}
@@ -386,7 +419,7 @@ function updatePreview() {
                             </table>
                         </td>
                         <td style="width: 30%; vertical-align: top; padding-left: 20px;">
-                            <div style="text-align: center; margin-bottom: 2px;">ИИН/БИН</div>
+                            <div style="text-align: center; margin-bottom: 2px;">${taxLabel}</div>
                             <div style="border: 1px solid black; text-align: center; padding: 5px; margin-bottom: 15px;">${val('c-tax')}</div>
                             <div style="border: 1px solid black; text-align: center; padding: 5px;">${val('p-tax')}</div>
                         </td>
@@ -565,11 +598,11 @@ async function loadHistory() {
             const dateStr = i.doc_date ? new Date(i.doc_date).toLocaleDateString('ru-RU') : 'дата не указана';
             return `
                 <div onclick='restoreFromHistory(${JSON.stringify(i)})' class="relative p-2 border rounded bg-gray-50 hover:bg-blue-50 cursor-pointer transition group">
-                    <div class="flex justify-between font-bold text-[9px] text-blue-600">
+                    <div class="flex justify-between font-bold text-[9px] text-blue-600 pr-6"> <!-- добавлен отступ справа -->
                         <span>№${i.doc_number || 'б/н'}</span>
                         <span>от ${dateStr}</span>
                     </div>
-                    <button onclick="event.stopPropagation(); deleteHistoryItem('${i.id}')" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition">✕</button>
+                    <button onclick="event.stopPropagation(); deleteHistoryItem('${i.id}')" class="absolute right-1 top-1/2 transform -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition">✕</button>
                 </div>
             `;
         }).join('');
@@ -630,7 +663,6 @@ window.restoreFromHistory = (i) => {
     setVal('c-address', i.c_address);
     setVal('c-contract', i.c_contract);
     
-    // Для АВР дополнительные поля
     setVal('p-ceo-role', i.p_ceo_role || '');
     setVal('c-ceo-role', i.c_ceo_role || '');
     setVal('c-ceo', i.c_ceo || '');
@@ -696,11 +728,9 @@ async function saveToDB() {
         c_contract: val('c-contract'),
         amount: totalAmount,
         items: docItems,
-        // Поля для АВР
         p_ceo_role: val('p-ceo-role'),
         c_ceo_role: val('c-ceo-role'),
         c_ceo: val('c-ceo'),
-        // Добавляем tax_id, так как в таблице оно NOT NULL
         tax_id: val('p-tax') || val('c-tax') || ''
     };
 
@@ -711,7 +741,6 @@ async function saveToDB() {
             alert("Ошибка при сохранении: " + error.message);
         } else {
             console.log("Документ сохранён");
-            // Принудительно обновляем историю после успешного сохранения
             switchHistoryTab(docType);
         }
     } catch (err) {
