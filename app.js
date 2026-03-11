@@ -15,13 +15,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         currentUser = session.user;
         document.getElementById('user-display').innerText = currentUser.email;
         document.getElementById('user-display').classList.remove('hidden');
-        document.getElementById('logout-btn').classList.remove('hidden'); // Кнопка выход
+        document.getElementById('logout-btn').classList.remove('hidden');
         document.getElementById('auto-save-hint').classList.remove('hidden');
         startApp();
     }
 });
 
-// --- СУММА ПРОПИСЬЮ ---
 function numberToWords(amount, country) {
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
@@ -57,7 +56,7 @@ function numberToWords(amount, country) {
     return (str.charAt(0).toUpperCase() + str.slice(1) + ` ${subStr} ${config[country].subunits}`);
 }
 
-// --- АВТОРИЗАЦИЯ ---
+// УПРАВЛЕНИЕ АВТОРИЗАЦИЕЙ
 document.getElementById('guest-btn').onclick = () => { isGuest = true; startApp(); };
 document.getElementById('login-btn').onclick = () => handleAuth('login');
 document.getElementById('reg-btn').onclick = () => document.getElementById('reg-modal').classList.remove('hidden');
@@ -75,11 +74,16 @@ function startApp() {
     document.getElementById('auth-section').classList.add('hidden');
     document.getElementById('app-section').classList.remove('hidden');
     document.getElementById('doc-date').valueAsDate = new Date();
-    if(!isGuest) { document.getElementById('history-box').classList.remove('hidden'); loadHistory(); }
-    renderCountryBtns(); renderItemsInputs(); updatePreview();
+    if(!isGuest) { 
+        document.getElementById('history-box').classList.remove('hidden'); 
+        loadHistory(); 
+    }
+    renderCountryBtns(); 
+    renderItemsInputs(); 
+    updatePreview();
 }
 
-// --- УПРАВЛЕНИЕ ТАБЛИЦЕЙ ТОВАРОВ ---
+// ТОВАРЫ
 window.addItem = () => { docItems.push({ code: (docItems.length + 1).toString(), name: '', qty: 1, unit: 'шт', price: 0 }); renderItemsInputs(); updatePreview(); };
 window.removeItem = (index) => { if (docItems.length > 1) docItems.splice(index, 1); renderItemsInputs(); updatePreview(); };
 window.updateItem = (index, field, value) => { docItems[index][field] = (field === 'qty' || field === 'price') ? parseFloat(value) || 0 : value; updatePreview(); };
@@ -88,7 +92,7 @@ function renderItemsInputs() {
     const cont = document.getElementById('items-container');
     cont.innerHTML = docItems.map((item, i) => `
         <div class="flex gap-1 items-center bg-gray-50 p-2 rounded border">
-            <input type="text" value="${item.name}" oninput="updateItem(${i}, 'name', this.value)" placeholder="Услуга/товар" class="flex-1 p-1 border rounded text-xs outline-none">
+            <input type="text" value="${item.name}" oninput="updateItem(${i}, 'name', this.value)" placeholder="Название" class="flex-1 p-1 border rounded text-xs outline-none">
             <input type="number" value="${item.qty}" oninput="updateItem(${i}, 'qty', this.value)" class="w-12 p-1 border rounded text-xs text-center">
             <input type="text" value="${item.unit}" oninput="updateItem(${i}, 'unit', this.value)" class="w-10 p-1 border rounded text-xs text-center">
             <input type="number" value="${item.price}" oninput="updateItem(${i}, 'price', this.value)" class="w-20 p-1 border rounded text-xs text-right">
@@ -97,10 +101,10 @@ function renderItemsInputs() {
     `).join('');
 }
 
-// --- ПЕРЕКЛЮЧАТЕЛИ СТРАН И ТИПОВ ---
+// ПЕРЕКЛЮЧАТЕЛИ
 function renderCountryBtns() {
     document.getElementById('country-btns').innerHTML = Object.keys(config).map(c => `
-        <button onclick="setCountry('${c}')" class="p-2 rounded border flex flex-col items-center gap-1 transition ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50 hover:bg-gray-100'}">
+        <button onclick="setCountry('${c}')" class="p-2 rounded border flex flex-col items-center gap-1 transition ${selectedCountry === c ? 'bg-slate-800 text-white' : 'bg-gray-50'}">
             <span class="text-xl">${config[c].flag}</span>
             <span class="text-[9px] font-bold uppercase">${config[c].name}</span>
         </button>
@@ -114,7 +118,7 @@ window.setDocType = (type) => {
     updatePreview();
 };
 
-// --- ПРЕДПРОСМОТР (ДИЗАЙН ИЗ ФАЙЛА) ---
+// ДИЗАЙН ПРЕДПРОСМОТРА
 function updatePreview() {
     const v = (id) => document.getElementById(id)?.value || '';
     const dNum = v('doc-number') || '___';
@@ -129,52 +133,65 @@ function updatePreview() {
     let html = '';
     if (docType === 'Счет') {
         html = `
-            <div style="font-family:Arial;font-size:10pt;color:#000">
-                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #000">
-                    <tr><td style="border:1px solid #000;padding:5px">Поставщик: <b>${v('p-name')}</b><br>${config[selectedCountry].tax}: ${v('p-tax')}</td><td style="border:1px solid #000;padding:5px">ИИК: ${v('p-iik')}<br>БИК: ${v('p-bik')}</td></tr>
+            <div style="font-family:Arial;font-size:10pt;color:#000;padding:10px">
+                <div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px">
+                    <b>Поставщик: ${v('p-name')}</b><br>
+                    Адрес: ${v('p-address')}<br>
+                    ${config[selectedCountry].tax}: ${v('p-tax')}
+                </div>
+                <table style="width:100%;margin-bottom:20px;font-size:9pt">
+                    <tr><td style="width:50%">Банк: ${v('p-bank')}</td><td>БИК: ${v('p-bik')}</td></tr>
+                    <tr><td>ИИК: ${v('p-iik')}</td><td>КБЕ: ${v('p-kbe')}</td></tr>
                 </table>
-                <h2 style="text-align:center">Счет на оплату №${dNum} от ${dDate}</h2>
-                <p><b>Заказчик:</b> ${v('c-name')}, ${v('c-tax')}</p>
-                <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
-                    <tr style="background:#eee;font-weight:bold"><td style="border:1px solid #000;padding:4px">№</td><td style="border:1px solid #000;padding:4px">Наименование</td><td style="border:1px solid #000;padding:4px">Кол-во</td><td style="border:1px solid #000;padding:4px">Ед.</td><td style="border:1px solid #000;padding:4px">Цена</td><td style="border:1px solid #000;padding:4px">Сумма</td></tr>
-                    ${rows}
+                <h2 style="text-align:center;text-decoration:underline">Счет на оплату №${dNum} от ${dDate}</h2>
+                <div style="margin:10px 0"><b>Заказчик:</b> ${v('c-name')}, ${config[selectedCountry].tax} ${v('c-tax')}, ${v('c-address')}</div>
+                <table style="width:100%;border-collapse:collapse;margin-top:10px">
+                    <thead style="background:#f2f2f2">
+                        <tr><th style="border:1px solid #000">№</th><th style="border:1px solid #000">Наименование</th><th style="border:1px solid #000">Кол-во</th><th style="border:1px solid #000">Ед.</th><th style="border:1px solid #000">Цена</th><th style="border:1px solid #000">Сумма</th></tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
                 </table>
-                <div style="text-align:right;font-weight:bold">Итого: ${total.toFixed(2)} ${config[selectedCountry].cur}</div>
-                <p>Всего к оплате: ${numberToWords(total, selectedCountry)}</p>
-                <div style="margin-top:30px">Руководитель: ___________ / ${v('p-ceo')}</div>
+                <div style="text-align:right;margin-top:10px;font-weight:bold">Итого к оплате: ${total.toFixed(2)} ${config[selectedCountry].cur}</div>
+                <p><i>Всего прописью: ${numberToWords(total, selectedCountry)}</i></p>
+                <div style="margin-top:40px">Руководитель: _________________ / ${v('p-ceo')}</div>
             </div>`;
     } else {
         html = `
-            <div style="font-family:Arial;font-size:9pt;color:#000">
+            <div style="font-family:Arial;font-size:9pt;color:#000;padding:10px">
                 <div style="text-align:right;font-size:7pt">${selectedCountry === 'РК' ? 'Приложение 50 к приказу МФ РК №562<br>Форма Р-1' : ''}</div>
-                <h3 style="text-align:center">АКТ ВЫПОЛНЕННЫХ РАБОТ №${dNum} от ${dDate}</h3>
-                <p><b>Исполнитель:</b> ${v('p-name')}, ${v('p-tax')}</p>
-                <p><b>Заказчик:</b> ${v('c-name')}, ${v('c-tax')}</p>
-                <table style="width:100%;border-collapse:collapse;margin-top:10px">
-                    <tr style="background:#eee;text-align:center;font-weight:bold"><td style="border:1px solid #000">№</td><td style="border:1px solid #000">Наименование работ</td><td style="border:1px solid #000">Кол-во</td><td style="border:1px solid #000">Цена</td><td style="border:1px solid #000">Сумма</td></tr>
+                <h3 style="text-align:center;margin-top:10px">АКТ ВЫПОЛНЕННЫХ РАБОТ (ОКАЗАННЫХ УСЛУГ)</h3>
+                <p style="text-align:center">№${dNum} от ${dDate}</p>
+                <div style="margin-top:10px"><b>Исполнитель:</b> ${v('p-name')}, ${config[selectedCountry].tax} ${v('p-tax')}, ${v('p-address')}</div>
+                <div style="margin-bottom:10px"><b>Заказчик:</b> ${v('c-name')}, ${config[selectedCountry].tax} ${v('c-tax')}, ${v('c-address')}</div>
+                <table style="width:100%;border-collapse:collapse">
+                    <tr style="background:#eee;font-weight:bold;text-align:center"><td style="border:1px solid #000">№</td><td style="border:1px solid #000">Наименование работ (услуг)</td><td style="border:1px solid #000">Кол-во</td><td style="border:1px solid #000">Цена</td><td style="border:1px solid #000">Сумма</td></tr>
                     ${rows}
                 </table>
-                <p style="text-align:right;font-weight:bold">Итого: ${total.toFixed(2)}</p>
-                <div style="display:flex;justify-content:space-between;margin-top:40px">
-                    <div>От Исполнителя:<br><br>__________ / ${v('p-ceo')}</div>
-                    <div>От Заказчика:<br><br>__________ / </div>
+                <div style="text-align:right;font-weight:bold;margin-top:5px">Итого: ${total.toFixed(2)} ${config[selectedCountry].cur}</div>
+                <div style="display:flex;justify-content:space-between;margin-top:50px">
+                    <div style="width:45%;border-top:1px solid #000;padding-top:5px">От Исполнителя: ${v('p-ceo')}</div>
+                    <div style="width:45%;border-top:1px solid #000;padding-top:5px">От Заказчика:</div>
                 </div>
             </div>`;
     }
     document.getElementById('doc-render-area').innerHTML = html;
 }
 
-// --- ИСТОРИЯ И УДАЛЕНИЕ ---
+// ИСТОРИЯ
 async function loadHistory() {
     if (!currentUser) return;
     const { data, error } = await db.from('invoices').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-    if (error) return;
+    if (error) { console.error(error); return; }
     window.currentHistoryData = data;
-    const items = data.filter(d => d.document_type === activeHistoryTab);
     
     document.getElementById('count-inv').innerText = data.filter(d => d.document_type === 'Счет').length;
     document.getElementById('count-avr').innerText = data.filter(d => d.document_type === 'АВР').length;
 
+    renderHistoryList();
+}
+
+function renderHistoryList() {
+    const items = window.currentHistoryData.filter(d => d.document_type === activeHistoryTab);
     const cont = document.getElementById('history-list');
     cont.innerHTML = items.length > 0 ? items.map(i => `
         <div class="p-2 border rounded bg-gray-50 hover:bg-blue-50 relative group cursor-pointer" onclick="restoreById('${i.id}')">
@@ -182,20 +199,20 @@ async function loadHistory() {
             <div class="text-[10px] truncate text-gray-600">${i.client_name || 'Без имени'}</div>
             <button onclick="event.stopPropagation(); deleteItem('${i.id}')" class="absolute right-1 top-1 text-red-400 hover:text-red-600 hidden group-hover:block">✕</button>
         </div>
-    `).join('') : '<div class="text-center py-4 text-gray-300 text-[10px]">Пусто</div>';
+    `).join('') : '<div class="text-center py-4 text-gray-300 text-[10px]">Нет записей</div>';
 }
-
-window.deleteItem = async (id) => {
-    if(!confirm("Удалить?")) return;
-    const { error } = await db.from('invoices').delete().eq('id', id);
-    if (error) alert("Ошибка: " + error.message); else loadHistory();
-};
 
 window.switchHistoryTab = (type) => {
     activeHistoryTab = type;
     document.getElementById('tab-h-inv').className = type === 'Счет' ? 'flex-1 py-2 text-[10px] font-bold bg-white text-blue-600 border-r shadow-inner' : 'flex-1 py-2 text-[10px] font-bold bg-gray-100 text-gray-400 border-r';
     document.getElementById('tab-h-avr').className = type === 'АВР' ? 'flex-1 py-2 text-[10px] font-bold bg-white text-blue-600 shadow-inner' : 'flex-1 py-2 text-[10px] font-bold bg-gray-100 text-gray-400';
-    loadHistory();
+    renderHistoryList();
+};
+
+window.deleteItem = async (id) => {
+    if(!confirm("Удалить этот документ?")) return;
+    const { error } = await db.from('invoices').delete().eq('id', id);
+    if (error) alert("Ошибка: " + error.message); else loadHistory();
 };
 
 window.restoreById = (id) => {
@@ -205,16 +222,20 @@ window.restoreById = (id) => {
     selectedCountry = i.country; docType = i.document_type; docItems = i.items || [];
     s('doc-number', i.doc_number); s('doc-date', i.doc_date);
     s('p-name', i.provider_name); s('p-tax', i.provider_tax_id);
-    s('p-iik', i.p_iik); s('p-bik', i.p_bik); s('p-ceo', i.provider_ceo);
-    s('c-name', i.client_name); s('c-tax', i.client_tax_id);
+    s('p-address', i.p_address); s('p-bank', i.p_bank); s('p-iik', i.p_iik); 
+    s('p-bik', i.p_bik); s('p-kbe', i.p_kbe); s('p-knp', i.p_knp); s('p-ceo', i.provider_ceo);
+    s('c-name', i.client_name); s('c-tax', i.client_tax_id); s('c-address', i.c_address);
     renderCountryBtns(); renderItemsInputs(); updatePreview();
 };
 
-// --- СОХРАНЕНИЕ И PDF ---
+// СОХРАНЕНИЕ
 async function downloadPDF() {
-    if(!isGuest && currentUser) await saveToDB();
+    if(!isGuest && currentUser) {
+        await saveToDB();
+    }
     const element = document.getElementById('doc-render-area');
-    html2pdf().from(element).set({ margin: 10, filename: 'doc.pdf', html2canvas: { scale: 2 } }).save();
+    const opt = { margin: 10, filename: `${docType}_${document.getElementById('doc-number').value}.pdf`, html2canvas: { scale: 2 } };
+    html2pdf().from(element).set(opt).save();
 }
 
 async function saveToDB() {
@@ -223,11 +244,17 @@ async function saveToDB() {
         user_id: currentUser.id, country: selectedCountry, document_type: docType,
         doc_number: v('doc-number'), doc_date: v('doc-date'),
         provider_name: v('p-name'), provider_tax_id: v('p-tax'),
-        p_iik: v('p-iik'), p_bik: v('p-bik'), provider_ceo: v('p-ceo'),
-        client_name: v('c-name'), client_tax_id: v('c-tax'),
+        p_address: v('p-address'), p_bank: v('p-bank'), p_iik: v('p-iik'), 
+        p_bik: v('p-bik'), p_kbe: v('p-kbe'), p_knp: v('p-knp'), provider_ceo: v('p-ceo'),
+        client_name: v('c-name'), client_tax_id: v('c-tax'), c_address: v('c-address'),
         amount: docItems.reduce((acc, it) => acc + (it.qty * it.price), 0),
         items: docItems
     };
     const { error } = await db.from('invoices').insert([payload]);
-    if (error) console.error("Save error:", error.message); else loadHistory();
+    if (error) {
+        console.error("Save Error:", error.message);
+        alert("Ошибка сохранения: " + error.message);
+    } else { 
+        loadHistory(); 
+    }
 }
