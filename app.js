@@ -1,5 +1,8 @@
 let currentUser = null, selectedCountry = 'РК', docType = 'Счет', isGuest = false, activeHistoryTab = 'Счет';
 
+// Глобальный массив для безопасного хранения истории без поломки HTML
+window.currentHistoryData = [];
+
 // Массив для хранения позиций
 let docItems = [{ code: '1', name: '', qty: 1, unit: 'шт', price: 0 }];
 
@@ -80,7 +83,7 @@ function numberToWords(amount, country) {
 document.getElementById('guest-btn').onclick = () => { isGuest = true; startApp(); };
 document.getElementById('login-btn').onclick = () => handleAuth('login');
 
-// 6. Всплывающее окно регистрации
+// Всплывающее окно регистрации
 document.getElementById('reg-btn').onclick = () => document.getElementById('reg-modal').classList.remove('hidden');
 window.closeRegModal = () => document.getElementById('reg-modal').classList.add('hidden');
 document.getElementById('submit-reg-btn').onclick = () => handleAuth('signup');
@@ -158,13 +161,11 @@ window.setDocType = (type) => {
 function renderForm() {
     let staffHtml = '';
     if (docType === 'Счет') {
-        // 11. Исполнитель заменен на Директор, добавлен Бухгалтер
         staffHtml = `
             <input type="text" id="p-ceo" placeholder="Директор (ФИО)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
             <input type="text" id="p-accountant" placeholder="Бухгалтер (ФИО)" class="w-full p-2 border rounded text-xs outline-none" oninput="updatePreview()">
         `;
     } else {
-        // Форма Р-1 (АВР)
         staffHtml = `
             <input type="text" id="p-ceo-role" placeholder="Должность Исполнителя (напр. Директор)" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
             <input type="text" id="p-ceo" placeholder="ФИО Исполнителя" class="w-full p-2 border rounded text-xs outline-none mb-2" oninput="updatePreview()">
@@ -239,7 +240,6 @@ function updatePreview() {
         `;
     }).join('');
 
-    // Расчет НДС из общей суммы (в том числе)
     const includeNds = document.getElementById('include-nds')?.checked;
     const ndsRate = parseFloat(document.getElementById('nds-rate')?.value) || 0;
     let ndsText = '0.00';
@@ -274,7 +274,7 @@ function updatePreview() {
                     </tr>
                     <tr>
                         <td style="border: 1px solid black; text-align: left; padding: 6px;">
-                            Банк бенефицира:<br>${val('p-bank')}
+                            Банк бенефициара:<br>${val('p-bank')}
                         </td>
                         <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">БИК<br><span style="font-weight:normal; display:block; margin-top:5px;">${val('p-bik')}</span></td>
                         <td style="border: 1px solid black; font-weight: bold; padding: 4px; background: #fafafa;">Код назначения платежа<br><span style="font-weight:normal; display:block; margin-top:5px;">${val('p-knp')}</span></td>
@@ -329,12 +329,17 @@ function updatePreview() {
     } else {
         let totalItemsQty = docItems.reduce((acc, it) => acc + it.qty, 0);
 
+        // Динамическая шапка АВР только для Казахстана
+        let headerAvrHtml = selectedCountry === 'РК' ? `
+            <div style="text-align: right; margin-bottom: 10px;">
+                Приложение 50<br>к приказу Министра финансов<br>Республики Казахстан<br>от 20 декабря 2012 года № 562<br><br>
+                <div style="font-weight: normal; margin-top: 5px;">Форма Р-1</div>
+            </div>
+        ` : `<div style="height: 30px;"></div>`; // Отступ для других стран
+
         html = `
             <div style="font-family: Arial, sans-serif; font-size: 8pt; color: #000; line-height: 1.2;">
-                <div style="text-align: right; margin-bottom: 10px;">
-                    Приложение 50<br>к приказу Министра финансов<br>Республики Казахстан<br>от 20 декабря 2012 года № 562<br><br>
-                    <div style="font-weight: normal; margin-top: 5px;">Форма Р-1</div>
-                </div>
+                ${headerAvrHtml}
 
                 <table style="width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 15px;">
                     <tr>
@@ -524,7 +529,6 @@ window.switchHistoryTab = (type) => {
 async function loadHistory() {
     if (!currentUser) return;
     
-    // 2. Исправленная подтяжка (с обработкой ошибок)
     const { data, error } = await db.from('invoices').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
     
     if (error) {
@@ -532,11 +536,12 @@ async function loadHistory() {
         return;
     }
 
-    // Разделяем данные для счетчиков
+    // Сохраняем в глобальный массив, чтобы не ломать HTML при передаче объекта
+    window.currentHistoryData = data;
+
     const invoicesData = data.filter(d => d.document_type === 'Счет');
     const avrData = data.filter(d => d.document_type === 'АВР');
     
-    // 5. Установка значений лимитов
     document.getElementById('count-inv').innerText = invoicesData.length;
     document.getElementById('count-avr').innerText = avrData.length;
 
@@ -544,19 +549,17 @@ async function loadHistory() {
     const cont = document.getElementById('history-list');
 
     if (currentTabList.length > 0) {
-        // Экранируем кавычки в JSON, чтобы HTML не "ломался"
         cont.innerHTML = currentTabList.map(i => {
-            const safeJSON = JSON.stringify(i).replace(/'/g, "&#39;");
             return `
             <div class="p-2 border rounded bg-gray-50 hover:bg-blue-50 transition group relative">
-                <div class="cursor-pointer" onclick='restoreFromHistory(${safeJSON})'>
+                <div class="cursor-pointer" onclick="restoreFromHistoryById('${i.id}')">
                     <div class="flex justify-between font-bold text-[9px] text-blue-600 pr-4">
                         <span>№${i.doc_number || 'б/н'} от ${i.doc_date ? new Date(i.doc_date).toLocaleDateString() : ''}</span>
                         <span>${i.amount ? i.amount.toFixed(2) : 0} ${config[i.country]?.cur || ''}</span>
                     </div>
                     <div class="text-[10px] truncate text-gray-600">${i.client_name || 'Без имени'}</div>
                 </div>
-                <button onclick="deleteHistoryItem('${i.id}')" class="absolute right-2 top-2 text-red-400 hover:text-red-600 hidden group-hover:block font-bold" title="Удалить">✕</button>
+                <button onclick="event.stopPropagation(); deleteHistoryItem('${i.id}')" class="absolute right-2 top-2 text-red-400 hover:text-red-600 hidden group-hover:block font-bold" title="Удалить">✕</button>
             </div>
         `}).join('');
     } else {
@@ -564,11 +567,22 @@ async function loadHistory() {
     }
 }
 
-// Функция удаления
+// Поиск и восстановление из безопасного массива
+window.restoreFromHistoryById = (id) => {
+    const item = window.currentHistoryData.find(d => d.id === id);
+    if (item) restoreFromHistory(item);
+};
+
+// Функция удаления (с изоляцией клика)
 window.deleteHistoryItem = async (id) => {
     if(confirm("Удалить этот документ из истории?")) {
-        await db.from('invoices').delete().eq('id', id);
-        loadHistory();
+        const { error } = await db.from('invoices').delete().eq('id', id);
+        if (error) {
+            console.error("Ошибка удаления:", error);
+            alert("Ошибка удаления! Убедитесь, что у вас есть права на удаление записей (RLS).");
+        } else {
+            loadHistory();
+        }
     }
 };
 
@@ -595,14 +609,13 @@ window.restoreFromHistory = (i) => {
     setVal('p-kbe', i.p_kbe); setVal('p-knp', i.p_knp);
     
     setVal('p-ceo', i.provider_ceo);
-    setVal('p-accountant', i.p_accountant); // Подтягиваем бухгалтера
+    setVal('p-accountant', i.p_accountant);
     
     setVal('c-name', i.client_name); setVal('c-tax', i.client_tax_id);
     setVal('c-address', i.c_address); setVal('c-contract', i.c_contract);
     
     setVal('p-ceo-role', ''); setVal('c-ceo-role', ''); setVal('c-ceo', '');
 
-    // Подтягиваем НДС
     if(document.getElementById('include-nds')) {
         document.getElementById('include-nds').checked = i.include_nds || false;
         document.getElementById('nds-rate').value = i.nds_rate || 12;
@@ -621,13 +634,12 @@ async function downloadPDF() {
 async function saveToDB() {
     if (isGuest || !currentUser) return;
     
-    // 5. Проверка лимитов перед сохранением
     const currentCount = docType === 'Счет' 
         ? parseInt(document.getElementById('count-inv').innerText) 
         : parseInt(document.getElementById('count-avr').innerText);
 
     if (currentCount >= 100) {
-        alert(`Достигнут лимит в 100 документов для раздела "${docType}". Пожалуйста, удалите старые записи, чтобы сохранить новые.`);
+        alert(`Достигнут лимит в 100 документов для раздела "${docType}". Пожалуйста, удалите старые записи.`);
         return;
     }
 
@@ -661,10 +673,12 @@ async function saveToDB() {
     };
     
     const { error } = await db.from('invoices').insert([payload]);
+    
+    // Вывод явной подсказки, если в базе забыли добавить новые колонки
     if (error) {
         console.error("Ошибка сохранения в базу:", error);
-        alert("Ошибка при сохранении в базу. Убедитесь, что все необходимые колонки (p_accountant, include_nds, nds_rate) созданы в Supabase.");
+        alert("Ошибка! Не удалось сохранить документ. \nСкорее всего, в базе данных Supabase не хватает новых колонок (p_accountant, include_nds, nds_rate). \n\nВыполните SQL-запрос для обновления таблицы.");
+    } else {
+        switchHistoryTab(docType);
     }
-
-    switchHistoryTab(docType);
 }
