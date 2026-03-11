@@ -189,7 +189,7 @@ function renderItemsInputs() {
 
 // ---------- ПРЕДПРОСМОТР ----------
 function numberToWords(amount, country) {
-    // Функция без изменений (оставлена как в исходнике)
+    // ... (функция без изменений, сохранена из исходного кода)
     const val = Math.floor(amount);
     const sub = Math.round((amount - val) * 100);
     
@@ -247,7 +247,6 @@ function updatePreview() {
     const dDateVal = val('doc-date');
     const dDate = dDateVal ? new Date(dDateVal).toLocaleDateString('ru-RU') : '___';
     
-    // Подсчет итогов
     let totalAmount = 0;
     const itemsHtml = docItems.map((it, index) => {
         const sum = it.qty * it.price;
@@ -265,7 +264,6 @@ function updatePreview() {
         `;
     }).join('');
 
-    // Расчёт НДС
     const ndsChecked = document.getElementById('include-nds')?.checked || false;
     let ndsRate = parseFloat(document.getElementById('nds-rate')?.value) || 0;
     if (ndsRate < 0) ndsRate = 0;
@@ -350,9 +348,7 @@ function updatePreview() {
             </div>
         `;
     } else {
-        // АВР (АКТ)
         let totalItemsQty = docItems.reduce((acc, it) => acc + it.qty, 0);
-        // Шапка с приложением — только для Казахстана
         const headerKZ = (selectedCountry === 'РК') ? `
             <div style="text-align: right; margin-bottom: 10px;">
                 Приложение 50<br>к приказу Министра финансов<br>Республики Казахстан<br>от 20 декабря 2012 года № 562<br><br>
@@ -703,7 +699,9 @@ async function saveToDB() {
         // Поля для АВР
         p_ceo_role: val('p-ceo-role'),
         c_ceo_role: val('c-ceo-role'),
-        c_ceo: val('c-ceo')
+        c_ceo: val('c-ceo'),
+        // Добавляем tax_id, так как в таблице оно NOT NULL
+        tax_id: val('p-tax') || val('c-tax') || ''
     };
 
     try {
